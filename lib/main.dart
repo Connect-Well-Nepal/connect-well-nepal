@@ -19,7 +19,7 @@ class ConnectWellNepalApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // App metadata
+      // metadata
       title: 'Connect Well Nepal',
       debugShowCheckedModeBanner: false,
       
