@@ -4,7 +4,7 @@ import 'package:connect_well_nepal/utils/colors.dart';
 
 /// Entry point of the Connect Well Nepal application
 /// 
-/// This file initializes the app with:
+/// This file initializes the app:
 /// - Material Design 3 theming
 /// - Custom color scheme
 /// - Global app configuration
