@@ -410,6 +410,29 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Update profile image
+  Future<void> updateProfileImage(String imagePath) async {
+    if (_currentUser == null) return;
+
+    // TODO: Upload to Firebase Storage and get download URL
+    // For now, use the local file path (works for demo)
+    // In production, upload to Firebase Storage:
+    // final storageService = StorageService();
+    // final downloadUrl = await storageService.uploadProfileImage(
+    //   userId: _currentUser!.id,
+    //   imageFile: File(imagePath),
+    // );
+    
+    // Simulate upload delay
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // For demo, use a file:// URL (in production, use Firebase Storage URL)
+    _currentUser = _currentUser!.copyWith(
+      profileImageUrl: 'file://$imagePath',
+    );
+    notifyListeners();
+  }
+
   /// Toggle dark mode
   void toggleTheme() {
     _themeMode =

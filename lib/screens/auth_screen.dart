@@ -292,32 +292,32 @@ class _AuthScreenState extends State<AuthScreen>
                     height: 54,
                     child: ElevatedButton(
                       onPressed: () async {
+                        // Capture references before popping dialog
+                        final navigator = Navigator.of(this.context);
+                        final appProvider = this.context.read<AppProvider>();
+                        final role = selectedRole;
+                        
                         Navigator.pop(context);
 
-                        if (selectedRole == UserRole.patient) {
+                        if (role == UserRole.patient) {
                           // Direct registration for patients
-                          final success = await context
-                              .read<AppProvider>()
-                              .completeGoogleSignIn(role: selectedRole);
+                          final success = await appProvider.completeGoogleSignIn(role: role);
 
                           if (mounted && success) {
-                            Navigator.of(context).pushReplacement(
+                            navigator.pushReplacement(
                               MaterialPageRoute(builder: (_) => const MainScreen()),
                             );
                           }
                         } else {
                           // Doctor/Care Provider needs additional info
-                          // First send verification for email (even though Google verified)
-                          final appProvider = context.read<AppProvider>();
                           await appProvider.sendVerificationCode(email);
 
                           if (mounted) {
-                            Navigator.push(
-                              context,
+                            navigator.push(
                               MaterialPageRoute(
                                 builder: (_) => DoctorRegistrationScreen(
                                   verificationCode: '', // Google users skip code
-                                  role: selectedRole,
+                                  role: role,
                                 ),
                               ),
                             );

@@ -122,6 +122,13 @@ class _MainScreenState extends State<MainScreen> {
     return 'Good Evening';
   }
 
+  /// Get combined list of clinics and hospitals sorted by distance
+  List<PlaceModel> _getCombinedHealthcareFacilities() {
+    final combined = [..._nearbyHospitals, ..._nearbyClinics];
+    combined.sort((a, b) => (a.distanceKm ?? 999).compareTo(b.distanceKm ?? 999));
+    return combined;
+  }
+
   /// Show self-care options bottom sheet
   void _showSelfCareOptions() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -762,7 +769,7 @@ class _MainScreenState extends State<MainScreen> {
 
           const SizedBox(height: 24),
 
-          // Nearby Clinics Section
+          // Nearby Healthcare Section (Clinics & Hospitals)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -771,7 +778,7 @@ class _MainScreenState extends State<MainScreen> {
                 Row(
                   children: [
                     Text(
-                      'Nearby Clinics',
+                      'Nearby Healthcare',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -790,7 +797,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    // TODO: Navigate to all clinics
+                    // TODO: Navigate to all healthcare facilities
                   },
                   child: const Text('See All'),
                 ),
@@ -800,7 +807,7 @@ class _MainScreenState extends State<MainScreen> {
 
           const SizedBox(height: 8),
 
-          // Clinics list
+          // Healthcare facilities list (combined clinics & hospitals)
           if (_isLoadingPlaces)
             const Padding(
               padding: EdgeInsets.all(24),
@@ -808,80 +815,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: CircularProgressIndicator(),
               ),
             )
-          else if (_nearbyClinics.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.location_off,
-                      size: 48,
-                      color: isDark ? Colors.white38 : AppColors.textSecondary,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _locationError ?? 'No clinics found nearby',
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            ...(_nearbyClinics.take(3).map((clinic) => _buildPlaceCard(clinic))),
-
-          const SizedBox(height: 24),
-
-          // Major Hospitals Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Major Hospitals',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : AppColors.primaryNavyBlue,
-                      ),
-                    ),
-                    if (_locationService.hasLocation) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: AppColors.successGreen,
-                      ),
-                    ],
-                  ],
-                ),
-                TextButton(
-                  onPressed: () {
-                    // TODO: Navigate to all hospitals
-                  },
-                  child: const Text('See All'),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Hospitals list
-          if (_isLoadingPlaces)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_nearbyHospitals.isEmpty)
+          else if (_nearbyHospitals.isEmpty && _nearbyClinics.isEmpty)
             Padding(
               padding: const EdgeInsets.all(24),
               child: Center(
@@ -894,17 +828,23 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'No hospitals found nearby',
+                      _locationError ?? 'No healthcare facilities found nearby',
                       style: TextStyle(
                         color: isDark ? Colors.white54 : AppColors.textSecondary,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: _loadNearbyPlaces,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
                     ),
                   ],
                 ),
               ),
             )
           else
-            ...(_nearbyHospitals.take(3).map((hospital) => _buildPlaceCard(hospital))),
+            ..._getCombinedHealthcareFacilities().take(5).map((place) => _buildPlaceCard(place)),
 
           const SizedBox(height: 24),
         ],
