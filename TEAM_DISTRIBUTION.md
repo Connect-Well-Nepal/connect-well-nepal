@@ -3,22 +3,66 @@
 **Project Type:** Telehealth Application (Similar to Timely Care)  
 **Team Size:** 4 Members  
 **Timeline:** Semester Project  
-**Tech Stack:** Flutter, Firebase (future), Material Design 3
+**Tech Stack:** Flutter, Firebase (future), Material Design 3, Provider (State Management)
 
 ---
 
-## 📱 Current Base Application Features
+## 📱 Current Application Features
 
-✅ **Implemented (Base Version):**
-- Splash Screen with branding
-- Home Screen with nearby clinics
-- Quick action buttons (Consult Now, Book Appointment)
-- Bottom navigation (4 tabs)
-- Profile management screen
-- Appointments screen (skeleton)
-- Consultation types screen (Video/Voice/Chat)
-- Health Resources screen (skeleton)
-- Clean architecture with proper folder structure
+### ✅ **Implemented Features:**
+
+#### **Core App Structure**
+- ✅ Splash Screen with animated branding
+- ✅ Material Design 3 theming with **Dark Mode support**
+- ✅ Bottom navigation (4 tabs - role-based labels)
+- ✅ Clean architecture with proper folder structure
+- ✅ Provider state management setup
+
+#### **Authentication & User Management**
+- ✅ **Login Screen** with email/password
+- ✅ **Signup Screen** with role selection (Patient/Doctor/Care Provider)
+- ✅ **Google Sign-In** integration
+- ✅ **Email Verification** with 6-digit OTP code
+- ✅ **Doctor Registration** screen (specialty, license, qualification)
+- ✅ Guest mode access
+- ✅ User model with role-based fields
+- ✅ Logout functionality
+
+#### **Patient Features**
+- ✅ Home Screen with personalized greeting
+- ✅ Profile avatar with initials
+- ✅ **Self-Care Hub** button with bottom sheet options
+- ✅ Quick Self-Care cards (4 options: Meditation, Exercise, Nutrition, Mental Health)
+- ✅ Available Doctors section with ratings
+- ✅ **Nearby Clinics** section (Google Places API ready)
+- ✅ **Major Hospitals** section with distance & ratings
+- ✅ Location service integration
+- ✅ Profile management with medical history
+
+#### **Doctor/Care Provider Features**
+- ✅ **Doctor Dashboard** (separate home screen)
+- ✅ Verification status banner
+- ✅ Quick stats (appointments, requests, patients)
+- ✅ Today's schedule with appointment cards
+- ✅ Patient request cards (accept/decline)
+- ✅ Quick actions (Schedule, Video Consultation, Prescription)
+- ✅ Earnings summary card
+- ✅ Professional profile with credentials display
+- ✅ Role-specific bottom navigation labels
+
+#### **Settings & Preferences**
+- ✅ **Dark Mode toggle**
+- ✅ Push notification toggle
+- ✅ Reminder time picker
+- ✅ Language selection (English/Nepali)
+- ✅ Privacy & Security options
+- ✅ About section
+- ✅ Help & Support
+
+#### **Screens (Skeleton/Basic)**
+- ✅ Appointments Screen (skeleton)
+- ✅ Consultation types Screen (Video/Voice/Chat options)
+- ✅ Health Resources Screen (skeleton)
 
 ---
 
@@ -63,6 +107,7 @@ flutter_local_notifications: ^17.0.0  # For appointment reminders
 **Integration Points:**
 - Connect with Team Member 4 for Firebase database
 - Work with Team Member 2 for consultation flow
+- Use existing `PlaceModel` for clinic integration
 
 ---
 
@@ -112,6 +157,7 @@ file_picker: ^8.0.0  # For sending files
 **Integration Points:**
 - Connect with Team Member 1 for appointment-to-call flow
 - Work with Team Member 4 for Firebase Realtime Database (chat)
+- Integrate with Doctor Dashboard "Start Video Consultation" button
 
 ---
 
@@ -126,10 +172,11 @@ file_picker: ^8.0.0  # For sending files
    - Implement bookmarking/favorites
 
 2. **Mental Health & Self-Care** (Week 3-4)
+   - Enhance existing Self-Care Hub with detailed content
    - Create mental wellness section
    - Add mood tracker widget
    - Implement self-assessment tools
-   - Add meditation/breathing exercises
+   - Expand meditation/breathing exercises (4-7-8 technique exists)
 
 3. **COVID-19 & Emergency Info** (Week 4-5)
    - Create COVID info dashboard
@@ -163,56 +210,62 @@ url_launcher: ^6.2.5  # For opening external links
 
 **Integration Points:**
 - Work with Team Member 4 for Firebase Storage (videos/images)
-- Coordinate with all members for consistent UI/UX
+- Coordinate with existing Self-Care bottom sheet options
+- Use existing dark mode support
 
 ---
 
 ### 🟡 **TEAM MEMBER 4: Backend, Authentication & Profile**
 **Focus Area:** `lib/services/` and `lib/screens/profile_screen.dart`
 
+**✅ Partially Complete - Enhance with Firebase:**
+
+**What's Already Done:**
+- ✅ User model with roles (patient/doctor/careProvider/guest)
+- ✅ App Provider with auth state management
+- ✅ Login/Signup screens with role selection
+- ✅ Google Sign-In integration (needs Firebase config)
+- ✅ Email verification flow (needs real email service)
+- ✅ Profile screen with role-based fields
+- ✅ Settings screen with preferences
+
 **Primary Tasks:**
 1. **Firebase Setup** (Week 1)
    - Initialize Firebase in the project
-   - Set up Authentication (Email, Google, Phone)
-   - Configure Firestore database
+   - Configure Firebase Auth (Email, Google, Phone)
+   - Set up Firestore database schema
    - Set up Firebase Storage
+   - Add SHA-1 key for Google Sign-In
 
-2. **Authentication Flow** (Week 2-3)
-   - Create `login_screen.dart`
-   - Create `signup_screen.dart`
-   - Create `forgot_password_screen.dart`
+2. **Connect Existing Auth to Firebase** (Week 2-3)
+   - Replace mock auth with Firebase Auth
+   - Implement real email verification
    - Add phone OTP verification
-   - Implement persistent login
+   - Implement persistent login (SharedPreferences/Firestore)
 
-3. **User Profile Management** (Week 3-4)
-   - Enhance existing `profile_screen.dart`
-   - Add profile image upload
-   - Create `edit_profile_screen.dart`
-   - Add medical records upload
-   - Implement data persistence to Firestore
+3. **User Profile Persistence** (Week 3-4)
+   - Save user profiles to Firestore
+   - Add profile image upload to Firebase Storage
+   - Sync doctor credentials for verification
+   - Implement medical records upload
 
 4. **Backend Services** (Week 4-6)
-   - Create `auth_service.dart`
-   - Create `database_service.dart`
-   - Create `storage_service.dart`
-   - Create `notification_service.dart`
+   - Create `auth_service.dart` (connect to Firebase)
+   - Create `database_service.dart` (Firestore CRUD)
+   - Create `storage_service.dart` (Firebase Storage)
+   - Create `notification_service.dart` (FCM)
    - Add error handling and loading states
 
-5. **Admin Panel (Bonus)** (Week 6)
-   - Create simple web dashboard
-   - Manage users and appointments
-   - Content management for resources
+5. **Doctor Verification System** (Week 5)
+   - Create admin verification workflow
+   - Update doctor `isVerifiedDoctor` flag
+   - Send verification status notifications
 
-**Files to Create:**
-- `lib/screens/login_screen.dart`
-- `lib/screens/signup_screen.dart`
-- `lib/screens/forgot_password_screen.dart`
-- `lib/screens/edit_profile_screen.dart`
-- `lib/services/auth_service.dart`
+**Files to Create/Update:**
+- `lib/services/auth_service.dart` (replace mock in app_provider.dart)
 - `lib/services/database_service.dart`
 - `lib/services/storage_service.dart`
 - `lib/services/notification_service.dart`
-- `lib/models/user_model.dart`
 - `lib/utils/validators.dart`
 
 **Packages to Add:**
@@ -221,13 +274,13 @@ firebase_core: ^2.27.0
 firebase_auth: ^4.17.8
 cloud_firestore: ^4.15.8
 firebase_storage: ^11.6.9
-google_sign_in: ^6.2.1
 firebase_messaging: ^14.7.19  # Push notifications
+shared_preferences: ^2.2.2  # Local storage
 ```
 
 **Integration Points:**
 - Support ALL team members with backend integration
-- Provide services for data persistence
+- Connect existing location/places services with real API
 - Manage user authentication state across app
 
 ---
@@ -236,6 +289,8 @@ firebase_messaging: ^14.7.19  # Push notifications
 
 ### **All Team Members:**
 - Follow existing code style and comments
+- Use existing `AppColors` from `lib/utils/colors.dart`
+- Support both light and dark themes
 - Test your features thoroughly
 - Use Git branches for development
 - Regular code reviews
@@ -248,45 +303,51 @@ firebase_messaging: ^14.7.19  # Push notifications
 
 ---
 
-## 🗂️ Folder Structure (Final)
+## 🗂️ Current Folder Structure
 
 ```
 lib/
-├── main.dart
+├── main.dart ✅
 ├── models/
 │   ├── clinic_model.dart ✅
+│   ├── place_model.dart ✅ (for nearby clinics/hospitals)
+│   ├── user_model.dart ✅ (with roles: patient/doctor/careProvider)
 │   ├── appointment_model.dart [Member 1]
 │   ├── doctor_model.dart [Member 1]
 │   ├── message_model.dart [Member 2]
 │   ├── article_model.dart [Member 3]
-│   ├── video_model.dart [Member 3]
-│   └── user_model.dart [Member 4]
+│   └── video_model.dart [Member 3]
+├── providers/
+│   └── app_provider.dart ✅ (auth, theme, user state)
 ├── screens/
 │   ├── splash_screen.dart ✅
-│   ├── main_screen.dart ✅
-│   ├── profile_screen.dart ✅
-│   ├── appointments_screen.dart ✅
-│   ├── consultation_screen.dart ✅
-│   ├── resources_screen.dart ✅
+│   ├── auth_screen.dart ✅ (login/signup with roles)
+│   ├── verification_screen.dart ✅ (email OTP)
+│   ├── doctor_registration_screen.dart ✅ (professional info)
+│   ├── main_screen.dart ✅ (role-based navigation)
+│   ├── doctor_dashboard_screen.dart ✅ (doctor home)
+│   ├── profile_screen.dart ✅ (role-based fields)
+│   ├── settings_screen.dart ✅ (dark mode, logout, etc.)
+│   ├── appointments_screen.dart ✅ (skeleton) [Member 1]
+│   ├── consultation_screen.dart ✅ (skeleton) [Member 2]
+│   ├── resources_screen.dart ✅ (skeleton) [Member 3]
 │   ├── booking_screen.dart [Member 1]
 │   ├── doctor_profile_screen.dart [Member 1]
 │   ├── video_call_screen.dart [Member 2]
 │   ├── voice_call_screen.dart [Member 2]
 │   ├── chat_screen.dart [Member 2]
 │   ├── article_detail_screen.dart [Member 3]
-│   ├── mood_tracker_screen.dart [Member 3]
-│   ├── login_screen.dart [Member 4]
-│   ├── signup_screen.dart [Member 4]
-│   └── edit_profile_screen.dart [Member 4]
-├── widgets/
-│   ├── clinic_card.dart ✅
-│   └── [Add more reusable widgets]
+│   └── mood_tracker_screen.dart [Member 3]
 ├── services/
+│   ├── location_service.dart ✅ (GPS location)
+│   ├── places_service.dart ✅ (Google Places API)
 │   ├── auth_service.dart [Member 4]
 │   ├── database_service.dart [Member 4]
 │   ├── storage_service.dart [Member 4]
 │   ├── video_call_service.dart [Member 2]
 │   └── notification_service.dart [Member 4]
+├── widgets/
+│   └── clinic_card.dart ✅
 └── utils/
     ├── colors.dart ✅
     ├── validators.dart [Member 4]
@@ -295,19 +356,37 @@ lib/
 
 ---
 
+## 📦 Current Dependencies (pubspec.yaml)
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2          # State management ✅
+  geolocator: ^13.0.2       # Location services ✅
+  http: ^1.2.2              # API calls ✅
+  google_sign_in: ^6.2.1    # Google auth ✅
+```
+
+---
+
 ## 🎯 Milestones & Timeline
 
 ### **Week 1-2: Foundation**
+- ✅ Base app structure complete
+- ✅ Authentication flow complete
+- ✅ Role-based UI complete
 - Member 1: Booking UI skeleton
 - Member 2: Research video SDK, basic integration
 - Member 3: Content structure & article pages
-- Member 4: Firebase setup & authentication
+- Member 4: Firebase setup & connect existing auth
 
 ### **Week 3-4: Core Features**
 - Member 1: Full appointment booking flow
 - Member 2: Video call working prototype
 - Member 3: Resource categories & mood tracker
-- Member 4: User profiles with Firebase
+- Member 4: User profiles with Firebase, doctor verification
 
 ### **Week 5-6: Integration & Polish**
 - All: Integrate features together
@@ -330,26 +409,37 @@ lib/
 # Pull latest code
 git pull origin main
 
+# Install dependencies
+flutter pub get
+
 # Create your feature branch
 git checkout -b feature/[your-name]-[feature]
 
 # Example:
-# git checkout -b feature/sachin-appointments
+# git checkout -b feature/member1-appointments
 ```
 
-### **Step 2: Add Your Packages**
-Edit `pubspec.yaml` and add your required packages
-
+### **Step 2: Run the App**
 ```bash
-flutter pub get
+# Run on device/emulator
+flutter run
+
+# For hot reload during development, press 'r'
+# For full restart, press 'R'
 ```
 
-### **Step 3: Development**
-- Create your screens/services
-- Test frequently with `flutter run`
-- Commit regularly
+### **Step 3: Test User Roles**
+- **Patient:** Sign up with "Patient" role selected
+- **Doctor:** Sign up with "Doctor" role, fill professional info
+- **Guest:** Use "Continue as Guest" button
 
-### **Step 4: Testing**
+### **Step 4: Development**
+- Create your screens/services in the appropriate folders
+- Follow existing patterns (check `doctor_dashboard_screen.dart` for reference)
+- Use `context.watch<AppProvider>()` for reactive state
+- Support dark mode using `Theme.of(context).brightness`
+
+### **Step 5: Testing**
 ```bash
 # Run tests
 flutter test
@@ -358,7 +448,7 @@ flutter test
 flutter analyze
 ```
 
-### **Step 5: Merge**
+### **Step 6: Merge**
 - Create Pull Request
 - Get code review from team
 - Merge after approval
@@ -376,27 +466,55 @@ flutter analyze
 
 ## 💡 Tips for Success
 
-1. **Start Simple:** Get basic version working first
-2. **Commit Often:** Small, meaningful commits
-3. **Ask for Help:** Don't get stuck for hours
-4. **Code Reviews:** Learn from each other's code
-5. **Testing:** Test on real devices, not just emulator
-6. **Documentation:** Comment your code well
-7. **UI Consistency:** Use AppColors and shared widgets
+1. **Use Existing Patterns:** Check `doctor_dashboard_screen.dart` and `auth_screen.dart` for UI patterns
+2. **Dark Mode:** Always test in both light and dark modes
+3. **Role-Based Logic:** Use `appProvider.isPatient`, `appProvider.isDoctor` for conditional rendering
+4. **Commit Often:** Small, meaningful commits
+5. **Ask for Help:** Don't get stuck for hours
+6. **Code Reviews:** Learn from each other's code
+7. **Testing:** Test on real devices, not just emulator
 
 ---
 
-## 📝 Additional Resources
+## 📝 Key Code Patterns
 
-### **Learning Materials:**
-- Flutter Docs: https://flutter.dev/docs
-- Firebase Flutter: https://firebase.flutter.dev
-- Material Design 3: https://m3.material.io
+### **Accessing User State:**
+```dart
+final appProvider = context.watch<AppProvider>();
 
-### **Video Tutorials:**
-- Flutter Firebase Auth: [YouTube]
-- Agora Video Call: [Agora Docs]
-- Flutter State Management: [Flutter Docs]
+// Check role
+if (appProvider.isDoctor) {
+  // Doctor-specific UI
+}
+
+// Get user info
+final user = appProvider.currentUser;
+print(user?.name);
+print(user?.specialty);
+```
+
+### **Dark Mode Support:**
+```dart
+final isDark = Theme.of(context).brightness == Brightness.dark;
+
+Container(
+  color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
+  child: Text(
+    'Hello',
+    style: TextStyle(
+      color: isDark ? Colors.white : AppColors.textPrimary,
+    ),
+  ),
+)
+```
+
+### **Navigation:**
+```dart
+Navigator.push(
+  context,
+  MaterialPageRoute(builder: (_) => const YourScreen()),
+);
+```
 
 ---
 
@@ -404,8 +522,10 @@ flutter analyze
 
 A feature is complete when:
 - ✅ Code is written and working
-- ✅ No linter errors
-- ✅ Tested on Android/iOS
+- ✅ No linter errors (`flutter analyze`)
+- ✅ Tested on Android (iOS if available)
+- ✅ Works in both light and dark mode
+- ✅ Role-appropriate (patient vs doctor)
 - ✅ Properly commented
 - ✅ Integrated with backend (if applicable)
 - ✅ Reviewed by at least 1 team member
@@ -414,8 +534,7 @@ A feature is complete when:
 ---
 
 **Created:** December 25, 2025  
-**Last Updated:** December 25, 2025  
-**Version:** 1.0
+**Last Updated:** December 29, 2025  
+**Version:** 2.0
 
 **Good luck, team! Let's build something amazing! 🚀🇳🇵**
-

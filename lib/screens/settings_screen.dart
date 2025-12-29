@@ -368,7 +368,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       value: value,
       onChanged: onChanged,
-      activeColor: AppColors.secondaryCrimsonRed,
+      activeThumbColor: AppColors.secondaryCrimsonRed,
     );
   }
 
