@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/settings_screen.dart';
 import 'package:connect_well_nepal/screens/auth_screen.dart';
@@ -26,7 +28,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _medicalHistoryController =
       TextEditingController();
 
+  final ImagePicker _imagePicker = ImagePicker();
   bool _isEditing = false;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -42,6 +46,153 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _emailController.text = user.email;
       _phoneController.text = user.phone ?? '';
       _medicalHistoryController.text = user.medicalHistory ?? '';
+    }
+  }
+
+  /// Show image picker options
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Change Profile Picture',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: AppColors.primaryNavyBlue),
+                ),
+                title: const Text('Take a Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryCrimsonRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library, color: AppColors.secondaryCrimsonRed),
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build profile image widget (handles both network and local files)
+  Widget _buildProfileImage(String imageUrl) {
+    if (imageUrl.startsWith('file://')) {
+      // Local file
+      final filePath = imageUrl.replaceFirst('file://', '');
+      return Image.file(
+        File(filePath),
+        fit: BoxFit.cover,
+        width: 112,
+        height: 112,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.person, size: 60);
+        },
+      );
+    } else {
+      // Network URL
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        width: 112,
+        height: 112,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.person, size: 60);
+        },
+      );
+    }
+  }
+
+  /// Pick image from camera or gallery
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _isUploadingImage = true;
+        });
+
+        // Update profile image via AppProvider
+        final appProvider = context.read<AppProvider>();
+        await appProvider.updateProfileImage(pickedFile.path);
+
+        if (mounted) {
+          setState(() {
+            _isUploadingImage = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated!'),
+              backgroundColor: AppColors.successGreen,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isUploadingImage = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update picture: $e'),
+            backgroundColor: AppColors.secondaryCrimsonRed,
+          ),
+        );
+      }
     }
   }
 
@@ -81,21 +232,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showLogoutConfirmation() {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Logout'),
           content: const Text('Are you sure you want to logout?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.pop(context);
-                await context.read<AppProvider>().logout();
+                // Capture references before popping
+                final navigator = Navigator.of(this.context);
+                final appProvider = this.context.read<AppProvider>();
+                
+                Navigator.pop(dialogContext);
+                await appProvider.logout();
+                
                 if (mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
+                  navigator.pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const AuthScreen()),
                     (route) => false,
                   );
@@ -162,12 +318,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           isDark ? const Color(0xFF1E2A3A) : Colors.white,
                       child: user?.profileImageUrl != null
                           ? ClipOval(
-                              child: Image.network(
-                                user!.profileImageUrl!,
-                                fit: BoxFit.cover,
-                                width: 112,
-                                height: 112,
-                              ),
+                              child: _buildProfileImage(user!.profileImageUrl!),
                             )
                           : Text(
                               user?.initials ?? 'G',
@@ -184,20 +335,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Positioned(
                     bottom: 0,
                     right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondaryCrimsonRed,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
-                          width: 3,
+                    child: GestureDetector(
+                      onTap: _isUploadingImage ? null : _showImagePickerOptions,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondaryCrimsonRed,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
+                            width: 3,
+                          ),
                         ),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 20,
+                        child: _isUploadingImage
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                       ),
                     ),
                   ),

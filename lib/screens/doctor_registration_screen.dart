@@ -75,17 +75,34 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     });
 
     final appProvider = context.read<AppProvider>();
+    bool success;
 
-    final success = await appProvider.completeSignUp(
-      verificationCode: widget.verificationCode,
-      specialty: _selectedSpecialty ?? _specialtyController.text,
-      licenseNumber: _licenseController.text.trim(),
-      qualification: _qualificationController.text.trim(),
-      yearsOfExperience: int.tryParse(_experienceController.text.trim()),
-      hospitalAffiliation: _hospitalController.text.trim().isNotEmpty
-          ? _hospitalController.text.trim()
-          : null,
-    );
+    // Check if this is a Google Sign-In user (empty verification code)
+    if (widget.verificationCode.isEmpty) {
+      // Google Sign-In user - use completeGoogleSignIn with doctor fields
+      success = await appProvider.completeGoogleSignIn(
+        role: widget.role,
+        specialty: _selectedSpecialty ?? _specialtyController.text,
+        licenseNumber: _licenseController.text.trim(),
+        qualification: _qualificationController.text.trim(),
+        yearsOfExperience: int.tryParse(_experienceController.text.trim()),
+        hospitalAffiliation: _hospitalController.text.trim().isNotEmpty
+            ? _hospitalController.text.trim()
+            : null,
+      );
+    } else {
+      // Email sign-up user - verify code and complete
+      success = await appProvider.completeSignUp(
+        verificationCode: widget.verificationCode,
+        specialty: _selectedSpecialty ?? _specialtyController.text,
+        licenseNumber: _licenseController.text.trim(),
+        qualification: _qualificationController.text.trim(),
+        yearsOfExperience: int.tryParse(_experienceController.text.trim()),
+        hospitalAffiliation: _hospitalController.text.trim().isNotEmpty
+            ? _hospitalController.text.trim()
+            : null,
+      );
+    }
 
     setState(() {
       _isSubmitting = false;
@@ -179,7 +196,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedSpecialty,
+                initialValue: _selectedSpecialty,
                 decoration: InputDecoration(
                   hintText: 'Select your specialty',
                   prefixIcon: const Icon(Icons.medical_information),
