@@ -471,21 +471,24 @@ class _AuthScreenState extends State<AuthScreen>
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            physics: _isLogin 
+                ? const NeverScrollableScrollPhysics() 
+                : const ClampingScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: _isLogin ? 0 : 8),
             child: Column(
               children: [
-                const SizedBox(height: 30),
+                SizedBox(height: _isLogin ? 30 : 16),
 
                 // Logo and App Name
                 _buildHeader(),
 
-                const SizedBox(height: 30),
+                SizedBox(height: _isLogin ? 30 : 16),
 
                 // Form Card
                 FadeTransition(
                   opacity: _fadeAnimation,
                   child: Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(_isLogin ? 24 : 20),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -506,7 +509,7 @@ class _AuthScreenState extends State<AuthScreen>
                           Text(
                             _isLogin ? 'Welcome Back!' : 'Create Account',
                             style: TextStyle(
-                              fontSize: 26,
+                              fontSize: _isLogin ? 26 : 22,
                               fontWeight: FontWeight.bold,
                               color: isDark
                                   ? Colors.white
@@ -514,37 +517,37 @@ class _AuthScreenState extends State<AuthScreen>
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _isLogin
-                                ? 'Sign in to continue your health journey'
-                                : 'Join Connect Well Nepal today',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isDark
-                                  ? Colors.white70
-                                  : AppColors.textSecondary,
+                          if (_isLogin) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Sign in to continue your health journey',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark
+                                    ? Colors.white70
+                                    : AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                          ],
 
-                          const SizedBox(height: 24),
+                          SizedBox(height: _isLogin ? 24 : 16),
 
                           // Role Selection (Signup only)
                           if (!_isLogin) ...[
                             Text(
                               'I am a...',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: isDark
                                     ? Colors.white70
                                     : AppColors.textPrimary,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             _buildRoleSelector(),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 14),
                           ],
 
                           // Name field (Signup only)
@@ -560,7 +563,7 @@ class _AuthScreenState extends State<AuthScreen>
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                           ],
 
                           // Email field
@@ -580,18 +583,9 @@ class _AuthScreenState extends State<AuthScreen>
                             },
                           ),
 
-                          const SizedBox(height: 16),
+                          SizedBox(height: _isLogin ? 16 : 12),
 
-                          // Phone field (Signup only)
-                          if (!_isLogin) ...[
-                            _buildTextField(
-                              controller: _phoneController,
-                              label: 'Phone (Optional)',
-                              icon: Icons.phone_outlined,
-                              keyboardType: TextInputType.phone,
-                            ),
-                            const SizedBox(height: 16),
-                          ],
+                          // Phone field removed from signup - users can add later in profile
 
                           // Password field
                           _buildTextField(
@@ -625,7 +619,7 @@ class _AuthScreenState extends State<AuthScreen>
 
                           // Confirm Password (Signup only)
                           if (!_isLogin) ...[
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             _buildTextField(
                               controller: _confirmPasswordController,
                               label: 'Confirm Password',
@@ -679,7 +673,7 @@ class _AuthScreenState extends State<AuthScreen>
                             ),
                           ],
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: _isLogin ? 20 : 16),
 
                           // Submit Button
                           Consumer<AppProvider>(
@@ -691,7 +685,7 @@ class _AuthScreenState extends State<AuthScreen>
                                   backgroundColor: AppColors.secondaryCrimsonRed,
                                   foregroundColor: Colors.white,
                                   padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
+                                      EdgeInsets.symmetric(vertical: _isLogin ? 16 : 14),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -719,68 +713,66 @@ class _AuthScreenState extends State<AuthScreen>
                             },
                           ),
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: _isLogin ? 20 : 14),
 
                           // OR Divider
                           Row(
                             children: [
                               Expanded(
-                                child: Divider(
-                                  color: isDark ? Colors.white24 : AppColors.dividerGray,
+                                child: Container(
+                                  height: 1,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.transparent,
+                                        isDark ? Colors.white30 : AppColors.dividerGray,
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                              Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark 
+                                      ? Colors.white.withValues(alpha: 0.1) 
+                                      : AppColors.backgroundOffWhite,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                                 child: Text(
-                                  'OR',
+                                  'or continue with',
                                   style: TextStyle(
+                                    fontSize: 12,
                                     color: isDark
-                                        ? Colors.white54
+                                        ? Colors.white60
                                         : AppColors.textSecondary,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                               Expanded(
-                                child: Divider(
-                                  color: isDark ? Colors.white24 : AppColors.dividerGray,
+                                child: Container(
+                                  height: 1,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        isDark ? Colors.white30 : AppColors.dividerGray,
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: _isLogin ? 20 : 14),
 
                           // Google Sign-In Button
-                          OutlinedButton.icon(
-                            onPressed: _handleGoogleSignIn,
-                            icon: Image.network(
-                              'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                              height: 24,
-                              width: 24,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.g_mobiledata, size: 24);
-                              },
-                            ),
-                            label: Text(
-                              'Continue with Google',
-                              style: TextStyle(
-                                color: isDark ? Colors.white : AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(
-                                color: isDark ? Colors.white24 : AppColors.dividerGray,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
+                          _buildGoogleSignInButton(isDark),
 
-                          const SizedBox(height: 16),
+                          SizedBox(height: _isLogin ? 16 : 12),
 
                           // Toggle Login/Signup
                           Row(
@@ -791,6 +783,7 @@ class _AuthScreenState extends State<AuthScreen>
                                     ? "Don't have an account? "
                                     : 'Already have an account? ',
                                 style: TextStyle(
+                                  fontSize: _isLogin ? 14 : 13,
                                   color: isDark
                                       ? Colors.white70
                                       : AppColors.textSecondary,
@@ -800,7 +793,8 @@ class _AuthScreenState extends State<AuthScreen>
                                 onTap: _toggleMode,
                                 child: Text(
                                   _isLogin ? 'Sign Up' : 'Sign In',
-                                  style: const TextStyle(
+                                  style: TextStyle(
+                                    fontSize: _isLogin ? 14 : 13,
                                     color: AppColors.secondaryCrimsonRed,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -814,26 +808,44 @@ class _AuthScreenState extends State<AuthScreen>
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: _isLogin ? 20 : 14),
 
                 // Continue as Guest
-                TextButton.icon(
-                  onPressed: _continueAsGuest,
-                  icon: const Icon(
-                    Icons.arrow_forward,
-                    color: Colors.white,
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: _isLogin ? 12 : 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
                   ),
-                  label: const Text(
-                    'Continue as Guest',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                  child: InkWell(
+                    onTap: _continueAsGuest,
+                    borderRadius: BorderRadius.circular(30),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                          Text(
+                          'Continue as Guest',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: _isLogin ? 15 : 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          size: _isLogin ? 18 : 16,
+                        ),
+                      ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                SizedBox(height: _isLogin ? 30 : 16),
               ],
             ),
           ),
@@ -843,14 +855,17 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Widget _buildHeader() {
+    final logoSize = _isLogin ? 60.0 : 45.0;
+    final padding = _isLogin ? 14.0 : 10.0;
+    
     return Column(
       children: [
         // Logo
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(padding),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(_isLogin ? 20 : 16),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.2),
@@ -863,30 +878,32 @@ class _AuthScreenState extends State<AuthScreen>
             borderRadius: BorderRadius.circular(12),
             child: Image.asset(
               'assets/logos/logo_icon.png',
-              height: 60,
-              width: 60,
+              height: logoSize,
+              width: logoSize,
               fit: BoxFit.cover,
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        const Text(
+        SizedBox(height: _isLogin ? 16 : 10),
+        Text(
           'Connect Well Nepal',
           style: TextStyle(
-            fontSize: 24,
+            fontSize: _isLogin ? 24 : 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
             letterSpacing: 1,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Your Health, Our Priority',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.white70,
+        if (_isLogin) ...[
+          const SizedBox(height: 4),
+          const Text(
+            'Your Health, Our Priority',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1035,6 +1052,126 @@ class _AuthScreenState extends State<AuthScreen>
             color: AppColors.secondaryCrimsonRed,
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build a beautiful Google Sign-In button with custom logo
+  Widget _buildGoogleSignInButton(bool isDark) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _handleGoogleSignIn,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2D3B4E) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? Colors.white24 : const Color(0xFFE0E0E0),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Google Logo
+              const _GoogleLogo(size: 22),
+              const SizedBox(width: 12),
+              Text(
+                'Continue with Google',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF3C4043),
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Google "G" logo widget with official colors
+class _GoogleLogo extends StatelessWidget {
+  final double size;
+  
+  const _GoogleLogo({this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        children: [
+          // Colored ring segments
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: SweepGradient(
+                startAngle: 0.0,
+                endAngle: 6.28,
+                colors: const [
+                  Color(0xFFEA4335), // Red
+                  Color(0xFFEA4335),
+                  Color(0xFFFBBC05), // Yellow
+                  Color(0xFFFBBC05),
+                  Color(0xFF34A853), // Green
+                  Color(0xFF34A853),
+                  Color(0xFF4285F4), // Blue
+                  Color(0xFF4285F4),
+                  Color(0xFFEA4335), // Red (close the loop)
+                ],
+                stops: const [0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0],
+              ),
+            ),
+          ),
+          // White center
+          Center(
+            child: Container(
+              width: size * 0.6,
+              height: size * 0.6,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          // Blue bar (arm of G) with cutout
+          Positioned(
+            top: size * 0.35,
+            right: 0,
+            child: Container(
+              width: size * 0.55,
+              height: size * 0.3,
+              color: const Color(0xFF4285F4),
+            ),
+          ),
+          // White rectangle to create the opening
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              width: size * 0.5,
+              height: size * 0.35,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

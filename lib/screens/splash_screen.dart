@@ -6,12 +6,12 @@ import 'package:connect_well_nepal/screens/main_screen.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 
 /// SplashScreen - Initial loading screen with logo
-///
+/// 
 /// Displays the Connect Well Nepal logo and branding
 /// Auto-navigates to AuthScreen or MainScreen based on login status
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
+  
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -57,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen>
     _animationController.dispose();
     super.dispose();
   }
-
+  
   /// Navigate to appropriate screen after delay
   Future<void> _navigateToNextScreen() async {
     await Future.delayed(const Duration(seconds: 2));
@@ -66,9 +66,9 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Check if user is already logged in
       if (appProvider.isLoggedIn) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-        );
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const MainScreen()),
+      );
       } else {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AuthScreen()),
@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
       }
     }
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -106,10 +106,10 @@ class _SplashScreenState extends State<SplashScreen>
                 opacity: _fadeAnimation,
                 child: ScaleTransition(
                   scale: _scaleAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Connect Well Nepal Logo
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Connect Well Nepal Logo
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -125,53 +125,53 @@ class _SplashScreenState extends State<SplashScreen>
                           ],
                         ),
                         child: Image.asset(
-                          'assets/logos/logo.png',
+              'assets/logos/logo.png',
                           width: 150,
                           height: 150,
                         ),
-                      ),
-
+            ),
+            
                       const SizedBox(height: 32),
-
-                      // App Name
+            
+            // App Name
                       Text(
-                        'Connect Well',
-                        style: TextStyle(
+              'Connect Well',
+              style: TextStyle(
                           fontSize: 36,
-                          fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
                           color: isDark
                               ? Colors.white
                               : AppColors.primaryNavyBlue,
                           letterSpacing: 1.2,
-                        ),
-                      ),
-
-                      const Text(
-                        'Nepal',
-                        style: TextStyle(
+              ),
+            ),
+            
+            const Text(
+              'Nepal',
+              style: TextStyle(
                           fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.secondaryCrimsonRed,
+                fontWeight: FontWeight.bold,
+                color: AppColors.secondaryCrimsonRed,
                           letterSpacing: 1.2,
-                        ),
-                      ),
-
+              ),
+            ),
+            
                       const SizedBox(height: 12),
-
+            
                       Text(
                         'Your Health, Our Priority',
-                        style: TextStyle(
-                          fontSize: 16,
+              style: TextStyle(
+                fontSize: 16,
                           color: isDark
                               ? Colors.white70
                               : AppColors.textSecondary,
                           letterSpacing: 0.5,
-                        ),
-                      ),
-
+              ),
+            ),
+            
                       const SizedBox(height: 60),
-
-                      // Loading indicator
+            
+            // Loading indicator
                       SizedBox(
                         width: 40,
                         height: 40,
@@ -182,8 +182,8 @@ class _SplashScreenState extends State<SplashScreen>
                               ? Colors.white12
                               : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                         ),
-                      ),
-                    ],
+            ),
+          ],
                   ),
                 ),
               );

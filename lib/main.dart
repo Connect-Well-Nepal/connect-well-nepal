@@ -5,7 +5,7 @@ import 'package:connect_well_nepal/screens/splash_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 
 /// Entry point of the Connect Well Nepal application
-///
+/// 
 /// This file initializes the app:
 /// - Provider for state management
 /// - Material Design 3 theming with dark mode support
@@ -23,16 +23,16 @@ void main() {
 /// Root widget of the application
 class ConnectWellNepalApp extends StatelessWidget {
   const ConnectWellNepalApp({super.key});
-
+  
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
-        return MaterialApp(
-          // metadata
-          title: 'Connect Well Nepal',
-          debugShowCheckedModeBanner: false,
-
+    return MaterialApp(
+      // metadata
+      title: 'Connect Well Nepal',
+      debugShowCheckedModeBanner: false,
+      
           // Theme mode from provider
           themeMode: appProvider.themeMode,
 
@@ -52,100 +52,100 @@ class ConnectWellNepalApp extends StatelessWidget {
   /// Build light theme
   ThemeData _buildLightTheme() {
     return ThemeData(
-      // Enable Material Design 3
-      useMaterial3: true,
+        // Enable Material Design 3
+        useMaterial3: true,
 
       brightness: Brightness.light,
-
-      // Color scheme based on AppColors
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primaryNavyBlue,
-        primary: AppColors.primaryNavyBlue,
-        secondary: AppColors.secondaryCrimsonRed,
-        surface: AppColors.backgroundWhite,
-        surfaceContainer: AppColors.backgroundOffWhite,
+        
+        // Color scheme based on AppColors
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primaryNavyBlue,
+          primary: AppColors.primaryNavyBlue,
+          secondary: AppColors.secondaryCrimsonRed,
+          surface: AppColors.backgroundWhite,
+          surfaceContainer: AppColors.backgroundOffWhite,
         brightness: Brightness.light,
-      ),
-
-      // AppBar theme
-      appBarTheme: const AppBarTheme(
-        centerTitle: true,
-        backgroundColor: AppColors.primaryNavyBlue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-
-      // Card theme
-      cardTheme: CardThemeData(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
         ),
-        color: AppColors.backgroundWhite,
-      ),
-
-      // Input decoration theme
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.backgroundOffWhite,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.dividerGray,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.primaryNavyBlue,
-            width: 2,
-          ),
-        ),
-      ),
-
-      // Elevated button theme
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.secondaryCrimsonRed,
+        
+        // AppBar theme
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          backgroundColor: AppColors.primaryNavyBlue,
           foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        
+        // Card theme
+        cardTheme: CardThemeData(
+          elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 12,
+          color: AppColors.backgroundWhite,
+        ),
+        
+        // Input decoration theme
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.backgroundOffWhite,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.dividerGray,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.primaryNavyBlue,
+              width: 2,
+            ),
           ),
         ),
-      ),
-
-      // Text theme
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+        
+        // Elevated button theme
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondaryCrimsonRed,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 12,
+            ),
+          ),
         ),
-        headlineMedium: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+        
+        // Text theme
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 16,
+            color: AppColors.textPrimary,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
         ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          color: AppColors.textPrimary,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          color: AppColors.textSecondary,
-        ),
-      ),
-
-      // Scaffold background
-      scaffoldBackgroundColor: AppColors.backgroundOffWhite,
+        
+        // Scaffold background
+        scaffoldBackgroundColor: AppColors.backgroundOffWhite,
 
       // Bottom navigation bar theme
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
