@@ -104,6 +104,17 @@ class _AuthScreenState extends State<AuthScreen>
       );
 
       if (mounted && success) {
+        // Show success message immediately
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Account created! Please check your email (${_emailController.text.trim()}) for the verification link.',
+            ),
+            backgroundColor: AppColors.successGreen,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        
         // Navigate to verification screen
         Navigator.push(
           context,
@@ -115,7 +126,8 @@ class _AuthScreenState extends State<AuthScreen>
           ),
         );
       } else if (mounted) {
-        _showErrorSnackBar('Failed to send verification code. Please try again.');
+        final errorMsg = appProvider.lastError ?? 'Failed to send verification code. Please try again.';
+        _showErrorSnackBar(errorMsg);
       }
     }
   }
@@ -437,6 +449,166 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
+  /// Show password reset dialog
+  void _showPasswordResetDialog(BuildContext context) {
+    final emailController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.lock_reset,
+                color: AppColors.secondaryCrimsonRed,
+              ),
+              const SizedBox(width: 12),
+              const Text('Reset Password'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter your email address and we\'ll send you a link to reset your password.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'Enter your email',
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : AppColors.backgroundOffWhite,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : AppColors.dividerGray,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryNavyBlue,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSending
+                  ? null
+                  : () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isSending
+                  ? null
+                  : () async {
+                      final email = emailController.text.trim();
+                      if (email.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter your email address'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (!email.contains('@')) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a valid email address'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        isSending = true;
+                      });
+
+                      final appProvider = context.read<AppProvider>();
+                      final success = await appProvider.sendPasswordResetEmail(email);
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Password reset email sent to $email\n\nPlease check your inbox and click the link to reset your password.',
+                              ),
+                              backgroundColor: AppColors.successGreen,
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
+                        } else {
+                          final errorMsg = appProvider.lastError ??
+                              'Failed to send password reset email. Please try again.';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMsg),
+                              backgroundColor: AppColors.secondaryCrimsonRed,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondaryCrimsonRed,
+                foregroundColor: Colors.white,
+              ),
+              child: isSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Send Reset Link'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _continueAsGuest() {
     context.read<AppProvider>().continueAsGuest();
     Navigator.of(context).pushReplacement(
@@ -654,14 +826,7 @@ class _AuthScreenState extends State<AuthScreen>
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Password reset feature coming soon!'),
-                                    ),
-                                  );
-                                },
+                                onPressed: () => _showPasswordResetDialog(context),
                                 child: const Text(
                                   'Forgot Password?',
                                   style: TextStyle(

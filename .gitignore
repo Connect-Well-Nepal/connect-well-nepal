@@ -2,8 +2,6 @@
 *.class
 *.log
 *.pyc
-*.swp
-.DS_Store
 .atom/
 .build/
 .buildlog/
@@ -34,9 +32,11 @@ migrate_working_dir/
 .packages
 .pub-cache/
 .pub/
-pubspec.lock
+# Note: pubspec.lock SHOULD be tracked for consistent dependencies
 /build/
 /coverage/
+*.g.dart
+*.freezed.dart
 
 # Symbolication related
 app.*.symbols
@@ -61,6 +61,13 @@ android/gradlew.bat
 android/gradle/wrapper/gradle-wrapper.jar
 android/key.properties
 android/app/google-services.json
+android/app/build/
+android/build/
+android/.idea/
+android/captures/
+android/app/release/
+android/app/debug/
+android/app/profile/
 
 # iOS related
 **/ios/**/*.mode1v3
@@ -117,13 +124,17 @@ linux/flutter/generated_plugins.cmake
 *.env
 
 # Firebase
+# Ignore generated files with API keys
 lib/firebase_options.dart
 google-services.json
 GoogleService-Info.plist
 firebase-debug.log
 firebase-debug.*.log
-.firebaserc
-firebase.json
+.firebase/
+firebase-debug.log*
+
+# Note: firebase.json, .firebaserc, and firestore.rules SHOULD be tracked
+# They contain project configuration, not sensitive keys
 
 # API Keys (NEVER commit these)
 **/secrets/
@@ -140,16 +151,28 @@ lcov.info
 # Build outputs
 *.apk
 *.aab
+*.ap_
 *.ipa
 *.app
 *.dSYM.zip
 *.dSYM
+*.so
+*.o
+*.a
+*.lib
+*.exe
+*.out
 
 # Temporary files
 *.tmp
 *.temp
 *.bak
+*.swp
+*.swo
+*~
 ~*
+.DS_Store
+Thumbs.db
 
 # Logs
 logs/

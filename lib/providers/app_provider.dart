@@ -1,7 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:connect_well_nepal/models/user_model.dart';
+import 'package:connect_well_nepal/services/auth_service.dart';
+import 'package:connect_well_nepal/services/database_service.dart';
 
 /// AppProvider - Central state management for Connect Well Nepal
 ///
@@ -13,10 +14,8 @@ import 'package:connect_well_nepal/models/user_model.dart';
 /// - Theme mode (dark/light)
 /// - App settings
 class AppProvider extends ChangeNotifier {
-  // Google Sign-In instance
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+  // Auth service
+  final AuthService _authService = AuthService();
 
   // User state
   UserModel? _currentUser;
@@ -26,10 +25,14 @@ class AppProvider extends ChangeNotifier {
   // Email verification
   String? _verificationCode;
   String? _pendingEmail;
+  String? _pendingPassword;
+  String? _pendingUid; // For Google Sign-In
   UserRole? _pendingRole;
   String? _pendingName;
   String? _pendingPhone;
   DateTime? _codeExpiry;
+  bool _emailSentSuccessfully = false; // Track if email was sent
+  String? _lastError; // Store last error message
 
   // Theme state
   ThemeMode _themeMode = ThemeMode.light;
@@ -81,33 +84,101 @@ class AppProvider extends ChangeNotifier {
 
   // Getter for verification code (for testing/demo only - remove in production)
   String? get testVerificationCode => _verificationCode;
+  
+  // Getter for email send status
+  bool get emailSentSuccessfully => _emailSentSuccessfully;
+  String? get lastError => _lastError;
 
   /// Send verification code to email
+  /// 
+  /// Optimized: Creates account, saves to Firestore, and sends verification email
   Future<bool> sendVerificationCode(String email) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      // Generate code
+      // Generate 6-digit code for verification screen
       _verificationCode = _generateVerificationCode();
       _pendingEmail = email;
       _codeExpiry = DateTime.now().add(const Duration(minutes: 10));
 
-      // TODO: Integrate with actual email service (Firebase, SendGrid, etc.)
-      // For now, we'll simulate sending and show the code in debug
-      await Future.delayed(const Duration(seconds: 1));
+      // Create Firebase account first (but don't complete signup yet)
+      if (_pendingPassword == null) {
+        debugPrint('❌ Password not set - cannot create Firebase account');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
 
-      debugPrint('🔐 Verification code for $email: $_verificationCode');
+      // Try to create Firebase account with email/password
+      // This also saves user to Firestore automatically
+      var authResult = await _authService.signUpWithEmail(
+        email: email,
+        password: _pendingPassword!,
+        name: _pendingName ?? 'User',
+        role: _pendingRole ?? UserRole.patient,
+        phone: _pendingPhone,
+      );
+
+      // If account already exists, tell user to use login screen
+      if (!authResult.success && 
+          (authResult.error?.contains('already exists') == true ||
+           authResult.error?.contains('email-already-in-use') == true)) {
+        _lastError = 'This email is already registered. Please use the login screen to sign in.';
+        debugPrint('❌ Email already registered: $email');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      } else if (!authResult.success) {
+        _lastError = authResult.error ?? 'Failed to create account';
+        debugPrint('❌ Failed to create Firebase account: ${authResult.error}');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Send Firebase verification email (this is fast, don't wait for Firestore operations)
+      _emailSentSuccessfully = await _authService.sendEmailVerification();
+      
+      if (_emailSentSuccessfully) {
+        debugPrint('✅ Firebase verification email sent to $email');
+      } else {
+        debugPrint('⚠️ Failed to send Firebase verification email');
+      }
+
+      // Store verification code in Firestore asynchronously (don't wait)
+      _storeVerificationCodeAsync(email);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Error sending verification code: $e');
+      debugPrint('❌ Error sending verification code: $e');
       _isLoading = false;
       notifyListeners();
       return false;
     }
+  }
+
+  /// Store verification code asynchronously (non-blocking)
+  void _storeVerificationCodeAsync(String email) {
+    Future.microtask(() async {
+      try {
+        final dbService = DatabaseService();
+        final firebaseUser = _authService.currentUser;
+        if (firebaseUser != null && _verificationCode != null && _codeExpiry != null) {
+          await dbService.storeVerificationCode(
+            userId: firebaseUser.uid,
+            code: _verificationCode!,
+            email: email,
+            expiresAt: _codeExpiry!,
+          );
+          debugPrint('✅ Verification code stored in Firestore');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to store verification code: $e');
+      }
+    });
   }
 
   /// Verify the code entered by user
@@ -141,6 +212,7 @@ class AppProvider extends ChangeNotifier {
   }) async {
     _pendingName = name;
     _pendingEmail = email;
+    _pendingPassword = password; // Store password for later
     _pendingRole = role;
     _pendingPhone = phone;
 
@@ -148,6 +220,9 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Complete sign up after verification (Step 2)
+  /// 
+  /// Note: Firebase account is already created in sendVerificationCode()
+  /// Here we just verify the code and update user profile with doctor fields if needed
   Future<bool> completeSignUp({
     required String verificationCode,
     // Doctor-specific fields
@@ -161,37 +236,71 @@ class AppProvider extends ChangeNotifier {
       return false;
     }
 
+    if (_pendingEmail == null || 
+        _pendingName == null || 
+        _pendingRole == null) {
+      debugPrint('❌ Missing pending data for signup');
+      return false;
+    }
+
     _isLoading = true;
     notifyListeners();
 
     try {
-      // TODO: Integrate with Firebase Auth
-      await Future.delayed(const Duration(seconds: 1));
+      // Firebase account was already created in sendVerificationCode()
+      // Get the current Firebase user
+      final firebaseUser = _authService.currentUser;
+      
+      if (firebaseUser == null) {
+        debugPrint('❌ No Firebase user found');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
 
-      // Create new user based on role
-      _currentUser = UserModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _pendingName!,
-        email: _pendingEmail!,
-        phone: _pendingPhone,
-        role: _pendingRole!,
-        isEmailVerified: true,
-        specialty: specialty,
-        licenseNumber: licenseNumber,
-        qualification: qualification,
-        yearsOfExperience: yearsOfExperience,
-        hospitalAffiliation: hospitalAffiliation,
-      );
+      // Check if we need to update user with doctor fields
+      if ((_pendingRole == UserRole.doctor || _pendingRole == UserRole.careProvider) &&
+          (specialty != null || licenseNumber != null)) {
+        // Update user in Firestore with doctor fields
+        final userModel = UserModel(
+          id: firebaseUser.uid,
+          name: _pendingName!,
+          email: _pendingEmail!,
+          phone: _pendingPhone,
+          role: _pendingRole!,
+          isEmailVerified: false, // Will be true after email verification
+          specialty: specialty,
+          licenseNumber: licenseNumber,
+          qualification: qualification,
+          yearsOfExperience: yearsOfExperience,
+          hospitalAffiliation: hospitalAffiliation,
+        );
+        
+        // Update user in Firestore
+        final dbService = DatabaseService();
+        await dbService.updateUser(firebaseUser.uid, {
+          'specialty': specialty,
+          'licenseNumber': licenseNumber,
+          'qualification': qualification,
+          'yearsOfExperience': yearsOfExperience,
+          'hospitalAffiliation': hospitalAffiliation,
+        });
+        
+        _currentUser = userModel;
+      } else {
+        // Fetch user from Firestore
+        final dbService = DatabaseService();
+        final userModel = await dbService.getUser(firebaseUser.uid);
+        _currentUser = userModel;
+      }
 
       _isLoggedIn = true;
-
-      // Clear pending data
       _clearPendingData();
-
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
+      debugPrint('❌ Complete signup error: $e');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -204,31 +313,46 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Trigger Google Sign-In flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final authResult = await _authService.signInWithGoogle();
 
-      if (googleUser == null) {
-        // User cancelled
+      if (!authResult.success) {
         _isLoading = false;
         notifyListeners();
-        return {'success': false, 'error': 'Sign in cancelled'};
+        return {'success': false, 'error': authResult.error ?? 'Google sign in failed'};
       }
 
-      // Get user details
-      _pendingEmail = googleUser.email;
-      _pendingName = googleUser.displayName ?? 'User';
+      if (authResult.user != null) {
+        // Existing user - sign them in
+        _currentUser = authResult.user;
+        _isLoggedIn = true;
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': true,
+          'needsRoleSelection': false,
+        };
+      }
+
+      if (authResult.needsRoleSelection) {
+        // New user - needs role selection
+        _pendingEmail = authResult.pendingEmail;
+        _pendingName = authResult.pendingName;
+        _pendingUid = authResult.pendingUid;
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': true,
+          'needsRoleSelection': true,
+          'email': authResult.pendingEmail,
+          'name': authResult.pendingName,
+          'photoUrl': authResult.pendingPhotoUrl,
+          'uid': authResult.pendingUid,
+        };
+      }
 
       _isLoading = false;
       notifyListeners();
-
-      // Return success with need for role selection
-      return {
-        'success': true,
-        'needsRoleSelection': true,
-        'email': googleUser.email,
-        'name': googleUser.displayName,
-        'photoUrl': googleUser.photoUrl,
-      };
+      return {'success': false, 'error': 'Unexpected error'};
     } catch (e) {
       debugPrint('Google Sign-In error: $e');
       _isLoading = false;
@@ -252,23 +376,28 @@ class AppProvider extends ChangeNotifier {
       return false;
     }
 
+    // Get UID from pending data or current Firebase user
+    String? uid = _pendingUid;
+    if (uid == null) {
+      final currentFirebaseUser = _authService.currentUser;
+      if (currentFirebaseUser == null) {
+        debugPrint('❌ No Firebase user found and no pending UID');
+        return false;
+      }
+      uid = currentFirebaseUser.uid;
+    }
+
     _isLoading = true;
     notifyListeners();
 
     try {
-      // TODO: Integrate with Firebase Auth
-      await Future.delayed(const Duration(seconds: 1));
-
-      final googleUser = _googleSignIn.currentUser;
-
-      _currentUser = UserModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+      final authResult = await _authService.completeGoogleSignIn(
+        uid: uid,
         name: _pendingName!,
         email: _pendingEmail!,
-        phone: phone,
-        profileImageUrl: googleUser?.photoUrl,
         role: role,
-        isEmailVerified: true, // Google accounts are pre-verified
+        photoUrl: null, // Will be set from Firebase user
+        phone: phone,
         specialty: specialty,
         licenseNumber: licenseNumber,
         qualification: qualification,
@@ -276,13 +405,21 @@ class AppProvider extends ChangeNotifier {
         hospitalAffiliation: hospitalAffiliation,
       );
 
-      _isLoggedIn = true;
-      _clearPendingData();
-
-      _isLoading = false;
-      notifyListeners();
-      return true;
+      if (authResult.success && authResult.user != null) {
+        _currentUser = authResult.user;
+        _isLoggedIn = true;
+        _clearPendingData();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        debugPrint('❌ Complete Google signin failed: ${authResult.error}');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     } catch (e) {
+      debugPrint('❌ Complete Google signin error: $e');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -298,23 +435,25 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Integrate with Firebase Auth
-      await Future.delayed(const Duration(seconds: 1));
-
-      // For demo purposes, create a user
-      _currentUser = UserModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: 'User',
+      final authResult = await _authService.signInWithEmail(
         email: email,
-        role: UserRole.patient, // Default role, would be fetched from DB
-        isEmailVerified: true,
+        password: password,
       );
-      _isLoggedIn = true;
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
+      if (authResult.success && authResult.user != null) {
+        _currentUser = authResult.user;
+        _isLoggedIn = true;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        debugPrint('❌ Login failed: ${authResult.error}');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     } catch (e) {
+      debugPrint('❌ Login error: $e');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -324,13 +463,7 @@ class AppProvider extends ChangeNotifier {
   /// Login with Google (for existing users)
   Future<bool> loginWithGoogle() async {
     final result = await signInWithGoogle();
-
-    if (result['success'] == true) {
-      // For existing users, we'd fetch their role from the database
-      // For now, assume they need to select if not found
-      return result['needsRoleSelection'] != true;
-    }
-    return false;
+    return result['success'] == true && result['needsRoleSelection'] != true;
   }
 
   /// Logout user
@@ -339,16 +472,10 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Sign out from Google if signed in
-      if (await _googleSignIn.isSignedIn()) {
-        await _googleSignIn.signOut();
-      }
+      await _authService.signOut();
     } catch (e) {
-      debugPrint('Error signing out from Google: $e');
+      debugPrint('Error signing out: $e');
     }
-
-    // TODO: Firebase signOut
-    await Future.delayed(const Duration(milliseconds: 500));
 
     _currentUser = null;
     _isLoggedIn = false;
@@ -361,10 +488,14 @@ class AppProvider extends ChangeNotifier {
   void _clearPendingData() {
     _verificationCode = null;
     _pendingEmail = null;
+    _pendingPassword = null;
+    _pendingUid = null;
     _pendingRole = null;
     _pendingName = null;
     _pendingPhone = null;
     _codeExpiry = null;
+    _emailSentSuccessfully = false;
+    _lastError = null;
   }
 
   /// Update user profile
@@ -468,5 +599,71 @@ class AppProvider extends ChangeNotifier {
     );
     _isLoggedIn = true;
     notifyListeners();
+  }
+
+  /// Send password reset email
+  Future<bool> sendPasswordResetEmail(String email) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final success = await _authService.sendPasswordResetEmail(email);
+      
+      if (success) {
+        debugPrint('✅ Password reset email sent to $email');
+        _lastError = null; // Clear any previous errors
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _lastError = 'Failed to send password reset email. Please check if the email is registered.';
+        debugPrint('❌ Failed to send password reset email');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _lastError = 'An error occurred. Please try again later.';
+      debugPrint('❌ Error sending password reset email: $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Change user password
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final authResult = await _authService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+
+      if (authResult.success) {
+        debugPrint('✅ Password changed successfully');
+        _lastError = null;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _lastError = authResult.error ?? 'Failed to change password';
+        debugPrint('❌ Failed to change password: ${authResult.error}');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _lastError = 'An error occurred. Please try again.';
+      debugPrint('❌ Error changing password: $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 }

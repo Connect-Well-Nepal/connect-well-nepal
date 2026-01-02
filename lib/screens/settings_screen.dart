@@ -444,65 +444,293 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showChangePasswordDialog(BuildContext context) {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool isChanging = false;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Change Password'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
             children: [
-              TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Current Password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+              Icon(
+                Icons.lock_outline,
+                color: AppColors.secondaryCrimsonRed,
               ),
-              const SizedBox(height: 16),
-              TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'New Password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Confirm New Password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+              const SizedBox(width: 12),
+              const Text('Change Password'),
             ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentPasswordController,
+                  obscureText: obscureCurrent,
+                  enabled: !isChanging,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    hintText: 'Enter your current password',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureCurrent ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscureCurrent = !obscureCurrent;
+                        });
+                      },
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : AppColors.backgroundOffWhite,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : AppColors.dividerGray,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryNavyBlue,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: obscureNew,
+                  enabled: !isChanging,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    hintText: 'Enter new password (min. 6 characters)',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureNew ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscureNew = !obscureNew;
+                        });
+                      },
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : AppColors.backgroundOffWhite,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : AppColors.dividerGray,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryNavyBlue,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: obscureConfirm,
+                  enabled: !isChanging,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    hintText: 'Re-enter new password',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureConfirm ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscureConfirm = !obscureConfirm;
+                        });
+                      },
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : AppColors.backgroundOffWhite,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : AppColors.dividerGray,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryNavyBlue,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              onPressed: isChanging
+                  ? null
+                  : () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                ),
+              ),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Password updated successfully!'),
-                    backgroundColor: AppColors.successGreen,
-                  ),
-                );
-              },
-              child: const Text('Update'),
+              onPressed: isChanging
+                  ? null
+                  : () async {
+                      final currentPassword = currentPasswordController.text.trim();
+                      final newPassword = newPasswordController.text.trim();
+                      final confirmPassword = confirmPasswordController.text.trim();
+
+                      // Validation
+                      if (currentPassword.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter your current password'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (newPassword.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a new password'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (newPassword.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password must be at least 6 characters long'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (newPassword != confirmPassword) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('New passwords do not match'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (currentPassword == newPassword) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('New password must be different from current password'),
+                            backgroundColor: AppColors.secondaryCrimsonRed,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        isChanging = true;
+                      });
+
+                      final appProvider = context.read<AppProvider>();
+                      final success = await appProvider.changePassword(
+                        currentPassword: currentPassword,
+                        newPassword: newPassword,
+                      );
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Password changed successfully!'),
+                              backgroundColor: AppColors.successGreen,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        } else {
+                          final errorMsg = appProvider.lastError ??
+                              'Failed to change password. Please try again.';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMsg),
+                              backgroundColor: AppColors.secondaryCrimsonRed,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondaryCrimsonRed,
+                foregroundColor: Colors.white,
+              ),
+              child: isChanging
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Change Password'),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 

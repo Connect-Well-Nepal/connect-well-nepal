@@ -28,9 +28,10 @@ class DatabaseService {
   Future<void> createUser(UserModel user) async {
     try {
       await _usersCollection.doc(user.id).set(user.toMap());
-      debugPrint('User created: ${user.id}');
+      debugPrint('✅ User created in Firestore: ${user.id} (${user.email})');
+      debugPrint('   Role: ${user.role}, Verified: ${user.isEmailVerified}');
     } catch (e) {
-      debugPrint('Error creating user: $e');
+      debugPrint('❌ Error creating user in Firestore: $e');
       rethrow;
     }
   }
@@ -67,6 +68,27 @@ class DatabaseService {
       debugPrint('User deleted: $userId');
     } catch (e) {
       debugPrint('Error deleting user: $e');
+      rethrow;
+    }
+  }
+
+  /// Store verification code for OTP email sending (via Cloud Function)
+  Future<void> storeVerificationCode({
+    required String userId,
+    required String code,
+    required String email,
+    required DateTime expiresAt,
+  }) async {
+    try {
+      await _db.collection('verification_codes').doc(userId).set({
+        'code': code,
+        'email': email,
+        'expiresAt': expiresAt.toIso8601String(),
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('Verification code stored for: $email');
+    } catch (e) {
+      debugPrint('Error storing verification code: $e');
       rethrow;
     }
   }

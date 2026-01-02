@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "connect-well-nepal",
+          "appId": "1:85329111654:android:1a5e4bdbbb44bc77829ba7",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "connect-well-nepal",
+          "configurations": {
+            "android": "1:85329111654:android:1a5e4bdbbb44bc77829ba7",
+            "web": "1:85329111654:web:cafe13365fd03f4c829ba7"
+          }
+        }
+      }
+    }
+  }
+}

@@ -8,14 +8,14 @@ import 'package:connect_well_nepal/screens/auth_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 
 /// ProfileScreen - User profile management screen
-///
+/// 
 /// Allows users to:
 /// - View and edit their profile information
 /// - Access settings
 /// - Logout
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
+  
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -195,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-
+  
   @override
   void dispose() {
     _nameController.dispose();
@@ -204,7 +204,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _medicalHistoryController.dispose();
     super.dispose();
   }
-
+  
   /// Handles the save profile action
   void _saveProfile() {
     final appProvider = context.read<AppProvider>();
@@ -218,7 +218,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _isEditing = false;
     });
-
+    
     // Show confirmation to user
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -267,7 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -297,7 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 16),
-
+              
               // Profile Avatar with Edit Button
               Stack(
                 children: [
@@ -313,7 +313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     child: CircleAvatar(
-                      radius: 60,
+                radius: 60,
                       backgroundColor:
                           isDark ? const Color(0xFF1E2A3A) : Colors.white,
                       child: user?.profileImageUrl != null
@@ -380,9 +380,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: isDark ? Colors.white : AppColors.textPrimary,
                 ),
               ),
-
+              
               const SizedBox(height: 4),
-
+              
               // Role Badge for doctors
               if (user?.isHealthcareProfessional == true) ...[
                 Container(
@@ -426,9 +426,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: isDark ? Colors.white54 : AppColors.textSecondary,
                 ),
               ),
-
+              
               const SizedBox(height: 24),
-
+              
               // Edit Profile Toggle
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -454,8 +454,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             : AppColors.primaryNavyBlue,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                     ),
                   ),
                 ],
@@ -488,11 +488,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : AppColors.primaryNavyBlue,
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
                     // Full Name Field
                     _buildTextField(
                       controller: _nameController,
@@ -534,27 +534,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         enabled: _isEditing,
                         maxLines: 4,
                         hintText: 'Add any relevant medical history...',
-                      ),
+                  ),
                     ],
 
                     if (_isEditing) ...[
                       const SizedBox(height: 24),
-
+              
                       // Save Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _saveProfile,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondaryCrimsonRed,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondaryCrimsonRed,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: const Text(
                             'Save Changes',
                             style: TextStyle(
                               fontSize: 16,

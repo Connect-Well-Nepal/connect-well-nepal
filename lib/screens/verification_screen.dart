@@ -46,75 +46,38 @@ class _VerificationScreenState extends State<VerificationScreen> {
   void initState() {
     super.initState();
     _startResendTimer();
-    // Show the test code after build completes
+    // Show success message that Firebase verification email was sent
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showTestCode();
+      final appProvider = context.read<AppProvider>();
+      
+      if (appProvider.emailSentSuccessfully) {
+        // Firebase verification email sent successfully
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Verification email sent to ${widget.email}\n\n'
+              'Please check your inbox and click the verification link to verify your email address.',
+            ),
+            backgroundColor: AppColors.successGreen,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        // Email failed
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to send verification email.\n\n'
+              'Please check your Firebase configuration.',
+            ),
+            backgroundColor: AppColors.secondaryCrimsonRed,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     });
   }
 
-  /// Show the verification code for testing (remove in production)
-  void _showTestCode() {
-    final appProvider = context.read<AppProvider>();
-    final code = appProvider.testVerificationCode;
-    if (code != null) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.bug_report, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Test Mode'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Since email service is not connected yet, here\'s your verification code:',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  code,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 8,
-                    color: AppColors.primaryNavyBlue,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                '⚠️ Remove this dialog in production',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.orange,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondaryCrimsonRed,
-              ),
-              child: const Text('Got it!'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
 
   @override
   void dispose() {

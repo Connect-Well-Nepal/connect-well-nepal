@@ -76,8 +76,14 @@ class AuthService {
         hospitalAffiliation: hospitalAffiliation,
       );
 
-      // Save user to Firestore
-      await _dbService.createUser(userModel);
+      // Save user to Firestore (with error handling)
+      try {
+        await _dbService.createUser(userModel);
+        debugPrint('✅ User saved to Firestore successfully');
+      } catch (e) {
+        debugPrint('⚠️ Failed to save user to Firestore: $e');
+        // Still return success - user is created in Auth, Firestore can be synced later
+      }
 
       return AuthResult.success(userModel);
     } on FirebaseAuthException catch (e) {
@@ -103,16 +109,23 @@ class AuthService {
         return AuthResult.failure('Sign in failed');
       }
 
-      // Fetch user data from Firestore
-      final userModel = await _dbService.getUser(credential.user!.uid);
+      // Fetch user data from Firestore (with timeout for faster response)
+      UserModel? userModel;
+      try {
+        userModel = await _dbService.getUser(credential.user!.uid)
+            .timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('⚠️ Firestore fetch timeout or error: $e');
+        // Continue with basic user model
+      }
 
       if (userModel != null) {
-        // Update email verification status
+        // Update email verification status asynchronously (don't wait)
         if (credential.user!.emailVerified && !userModel.isEmailVerified) {
-          await _dbService.updateUser(
+          _dbService.updateUser(
             credential.user!.uid,
             {'isEmailVerified': true},
-          );
+          ).catchError((e) => debugPrint('Failed to update verification status: $e'));
         }
         return AuthResult.success(userModel);
       } else {
@@ -123,7 +136,9 @@ class AuthService {
           email: email,
           isEmailVerified: credential.user!.emailVerified,
         );
-        await _dbService.createUser(newUser);
+        // Create user asynchronously (don't wait)
+        _dbService.createUser(newUser)
+            .catchError((e) => debugPrint('Failed to create user in Firestore: $e'));
         return AuthResult.success(newUser);
       }
     } on FirebaseAuthException catch (e) {
@@ -222,10 +237,52 @@ class AuthService {
   Future<bool> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
+      debugPrint('✅ Password reset email sent to $email');
       return true;
-    } catch (e) {
-      debugPrint('Password reset error: $e');
+    } on FirebaseAuthException catch (e) {
+      debugPrint('❌ Password reset error: ${e.code} - ${e.message}');
       return false;
+    } catch (e) {
+      debugPrint('❌ Password reset error: $e');
+      return false;
+    }
+  }
+
+  /// Change user password
+  /// Requires re-authentication for security
+  Future<AuthResult> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = currentUser;
+      if (user == null || user.email == null) {
+        return AuthResult.failure('No user logged in');
+      }
+
+      // Re-authenticate user with current password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password
+      await user.updatePassword(newPassword);
+      
+      debugPrint('✅ Password changed successfully');
+      return AuthResult.success(await _dbService.getUser(user.uid) ?? UserModel(
+        id: user.uid,
+        name: user.displayName ?? 'User',
+        email: user.email!,
+        isEmailVerified: user.emailVerified,
+      ));
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.failure(_getErrorMessage(e.code));
+    } catch (e) {
+      debugPrint('Change password error: $e');
+      return AuthResult.failure('Failed to change password. Please try again.');
     }
   }
 
@@ -344,6 +401,8 @@ class AuthService {
         return 'No account found with this email';
       case 'wrong-password':
         return 'Incorrect password';
+      case 'invalid-credential':
+        return 'Incorrect email or password';
       case 'email-already-in-use':
         return 'An account already exists with this email';
       case 'invalid-email':
@@ -361,6 +420,7 @@ class AuthService {
       case 'invalid-verification-id':
         return 'Verification expired. Please try again';
       default:
+        debugPrint('Unhandled Firebase Auth error code: $code');
         return 'An error occurred. Please try again';
     }
   }
