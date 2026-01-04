@@ -50,7 +50,7 @@ class DoctorProfileScreen extends StatelessWidget {
                       backgroundColor: Colors.white,
                       child: CircleAvatar(
                         radius: 56,
-                        backgroundColor: Colors.white.withOpacity(0.3),
+                        backgroundColor: Colors.white.withValues(alpha: 0.3),
                         backgroundImage: doctor.photoUrl != null
                             ? NetworkImage(doctor.photoUrl!)
                             : null,
@@ -69,39 +69,25 @@ class DoctorProfileScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Verified badge
+                  // Verified badge - positioned at bottom right of avatar
                   if (doctor.isVerified)
                     Positioned(
-                      top: 120,
+                      bottom: 0,
                       right: 0,
-                      left: 160,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: AppColors.successGreen,
-                          borderRadius: BorderRadius.circular(12),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2,
+                          ),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.verified,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Verified',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        child: const Icon(
+                          Icons.verified,
+                          color: Colors.white,
+                          size: 16,
                         ),
                       ),
                     ),
@@ -161,7 +147,7 @@ class DoctorProfileScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isDark
-                        ? AppColors.primaryNavyBlue.withOpacity(0.1)
+                        ? AppColors.primaryNavyBlue.withValues(alpha: 0.1)
                         : AppColors.backgroundOffWhite,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -301,10 +287,10 @@ class DoctorProfileScreen extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryNavyBlue.withOpacity(0.1),
+                                color: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppColors.primaryNavyBlue.withOpacity(0.3),
+                                  color: AppColors.primaryNavyBlue.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Text(
@@ -338,7 +324,7 @@ class DoctorProfileScreen extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: isAvailable
-                              ? AppColors.successGreen.withOpacity(0.1)
+                              ? AppColors.successGreen.withValues(alpha: 0.1)
                               : isDark
                                   ? Colors.grey[800]
                                   : Colors.grey[200],
@@ -392,10 +378,10 @@ class DoctorProfileScreen extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: isPast
-                                    ? Colors.grey.withOpacity(0.1)
+                                    ? Colors.grey.withValues(alpha: 0.1)
                                     : slot.isAvailable
-                                        ? AppColors.primaryNavyBlue.withOpacity(0.1)
-                                        : Colors.grey.withOpacity(0.1),
+                                        ? AppColors.primaryNavyBlue.withValues(alpha: 0.1)
+                                        : Colors.grey.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: isPast
@@ -448,7 +434,7 @@ class DoctorProfileScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    color: AppColors.primaryNavyBlue.withOpacity(0.1),
+                    color: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Row(
@@ -568,7 +554,7 @@ class DoctorProfileScreen extends StatelessWidget {
           color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),

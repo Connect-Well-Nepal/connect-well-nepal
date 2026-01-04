@@ -180,10 +180,10 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search doctors...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                 prefixIcon: const Icon(Icons.search, color: Colors.white70),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.15),
+                fillColor: Colors.white.withValues(alpha: 0.15),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -212,7 +212,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                     onSelected: (selected) {
                       setState(() => _selectedSpecialty = specialty);
                     },
-                    selectedColor: AppColors.primaryNavyBlue.withOpacity(0.2),
+                    selectedColor: AppColors.primaryNavyBlue.withValues(alpha: 0.2),
                     checkmarkColor: AppColors.primaryNavyBlue,
                     labelStyle: TextStyle(
                       color: isSelected 
@@ -275,7 +275,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
               // Doctor avatar
               CircleAvatar(
                 radius: 30,
-                backgroundColor: AppColors.primaryNavyBlue.withOpacity(0.1),
+                backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                 child: Text(
                   doctor['name'].split(' ').last[0],
                   style: TextStyle(
@@ -308,8 +308,8 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: doctor['available'] 
-                                ? AppColors.successGreen.withOpacity(0.1)
-                                : Colors.red.withOpacity(0.1),
+                                ? AppColors.successGreen.withValues(alpha: 0.1)
+                                : Colors.red.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -456,7 +456,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: AppColors.primaryNavyBlue.withOpacity(0.1),
+                        backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                         child: Text(
                           doctor['name'].split(' ').last[0],
                           style: TextStyle(

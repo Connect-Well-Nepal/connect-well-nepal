@@ -35,6 +35,8 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
   }
 
   Future<void> _loadMorePlaces() async {
+    if (_isLoading) return; // Prevent multiple simultaneous loads
+    
     setState(() => _isLoading = true);
     
     try {
@@ -43,12 +45,30 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
         forceRefresh: true,
       );
       
-      setState(() {
-        _places = places;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _places = places;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Error loading healthcare places: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        // Show error message to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load healthcare facilities: ${e.toString()}'),
+            backgroundColor: AppColors.secondaryCrimsonRed,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _loadMorePlaces,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -97,10 +117,10 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search hospitals, clinics...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                 prefixIcon: const Icon(Icons.search, color: Colors.white70),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.15),
+                fillColor: Colors.white.withValues(alpha: 0.15),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -130,7 +150,7 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
                             onSelected: (selected) {
                               setState(() => _selectedFilter = filter);
                             },
-                            selectedColor: AppColors.primaryNavyBlue.withOpacity(0.2),
+                            selectedColor: AppColors.primaryNavyBlue.withValues(alpha: 0.2),
                             checkmarkColor: AppColors.primaryNavyBlue,
                             labelStyle: TextStyle(
                               color: isSelected 
@@ -275,8 +295,8 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   color: isHospital
-                      ? Colors.red.withOpacity(0.1)
-                      : AppColors.primaryNavyBlue.withOpacity(0.1),
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -310,8 +330,8 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: isHospital
-                                ? Colors.red.withOpacity(0.1)
-                                : AppColors.primaryNavyBlue.withOpacity(0.1),
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -397,8 +417,8 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: place.isOpen
-                                ? AppColors.successGreen.withOpacity(0.1)
-                                : Colors.red.withOpacity(0.1),
+                                ? AppColors.successGreen.withValues(alpha: 0.1)
+                                : Colors.red.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -475,8 +495,8 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
                         height: 64,
                         decoration: BoxDecoration(
                           color: place.isHospital
-                              ? Colors.red.withOpacity(0.1)
-                              : AppColors.primaryNavyBlue.withOpacity(0.1),
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Icon(
@@ -503,8 +523,8 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: place.isHospital
-                                    ? Colors.red.withOpacity(0.1)
-                                    : AppColors.primaryNavyBlue.withOpacity(0.1),
+                                    ? Colors.red.withValues(alpha: 0.1)
+                                    : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -644,7 +664,7 @@ class _AllHealthcareScreenState extends State<AllHealthcareScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

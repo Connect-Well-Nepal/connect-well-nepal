@@ -164,7 +164,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
 
         // Update profile image via AppProvider
+        // Capture context-dependent objects before async operation
+        // ignore: use_build_context_synchronously
         final appProvider = context.read<AppProvider>();
+        // ignore: use_build_context_synchronously
+        final messenger = ScaffoldMessenger.of(context);
         await appProvider.updateProfileImage(pickedFile.path);
 
         if (mounted) {
@@ -172,7 +176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _isUploadingImage = false;
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(
               content: Text('Profile picture updated!'),
               backgroundColor: AppColors.successGreen,
@@ -186,7 +190,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Failed to update picture: $e'),
             backgroundColor: AppColors.secondaryCrimsonRed,

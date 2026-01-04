@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/settings_screen.dart';
+import 'package:connect_well_nepal/screens/appointment_screen.dart';
+import 'package:connect_well_nepal/services/database_service.dart';
+import 'package:connect_well_nepal/models/appointment_model.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 
 /// DoctorDashboardScreen - Home screen for doctors/care providers
@@ -19,6 +22,99 @@ class DoctorDashboardScreen extends StatefulWidget {
 }
 
 class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
+  final DatabaseService _databaseService = DatabaseService();
+  List<Appointment> _todayAppointments = [];
+  List<Appointment> _pendingRequests = [];
+  bool _isLoadingAppointments = true;
+  int _totalPatients = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppointments();
+  }
+
+  /// Load appointments for doctor
+  Future<void> _loadAppointments() async {
+    setState(() {
+      _isLoadingAppointments = true;
+    });
+
+    try {
+      final appProvider = context.read<AppProvider>();
+      final currentUser = appProvider.currentUser;
+      
+      if (currentUser == null || currentUser.isGuest || currentUser.id == 'guest') {
+        setState(() {
+          _todayAppointments = [];
+          _pendingRequests = [];
+          _isLoadingAppointments = false;
+        });
+        return;
+      }
+
+      final appointmentsData = await _databaseService.getUserAppointments(
+        currentUser.id,
+        isDoctor: true,
+      );
+
+      final appointments = appointmentsData
+          .map((data) {
+            try {
+              final dateTimeStr = data['dateTime'] ?? data['appointmentTime'];
+              if (dateTimeStr == null) return null;
+              
+              return Appointment.fromMap({
+                ...data,
+                'dateTime': dateTimeStr,
+                'appointmentTime': dateTimeStr,
+                'createdAt': data['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+                'updatedAt': data['updatedAt']?.toString(),
+              });
+            } catch (e) {
+              debugPrint('Error parsing appointment: $e');
+              return null;
+            }
+          })
+          .whereType<Appointment>()
+          .toList();
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+
+      // Today's appointments (confirmed and upcoming)
+      _todayAppointments = appointments
+          .where((apt) => 
+              apt.status == 'confirmed' && 
+              apt.dateTime.isAfter(now) &&
+              apt.dateTime.isBefore(tomorrow))
+          .toList();
+      _todayAppointments.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+
+      // Pending requests
+      _pendingRequests = appointments
+          .where((apt) => apt.status == 'pending')
+          .toList();
+      _pendingRequests.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+
+      // Count unique patients
+      final patientIds = appointments
+          .map((apt) => apt.patientId)
+          .toSet();
+      _totalPatients = patientIds.length;
+
+    } catch (e) {
+      debugPrint('Error loading appointments: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingAppointments = false;
+        });
+      }
+    }
+  }
+
   /// Get greeting based on time of day
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -199,7 +295,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.calendar_today,
-                  value: '8',
+                  value: '${_todayAppointments.length}',
                   label: "Today's\nAppointments",
                   color: Colors.blue,
                 ),
@@ -208,7 +304,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.pending_actions,
-                  value: '3',
+                  value: '${_pendingRequests.length}',
                   label: 'Pending\nRequests',
                   color: Colors.orange,
                 ),
@@ -217,7 +313,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.people,
-                  value: '156',
+                  value: '$_totalPatients',
                   label: 'Total\nPatients',
                   color: Colors.green,
                 ),
@@ -228,45 +324,92 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           const SizedBox(height: 24),
 
           // Today's Schedule Section
-          _buildSectionHeader('Today\'s Schedule', onSeeAll: () {}),
+          _buildSectionHeader('Today\'s Schedule', onSeeAll: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AppointmentsScreen()),
+            );
+          }),
           const SizedBox(height: 12),
 
           // Appointment Cards
-          _buildAppointmentCard(
-            patientName: 'Ram Sharma',
-            time: '9:00 AM',
-            type: 'Video Consultation',
-            status: 'upcoming',
-          ),
-          _buildAppointmentCard(
-            patientName: 'Sita Thapa',
-            time: '10:30 AM',
-            type: 'In-Person Visit',
-            status: 'upcoming',
-          ),
-          _buildAppointmentCard(
-            patientName: 'Krishna Gurung',
-            time: '11:30 AM',
-            type: 'Follow-up',
-            status: 'upcoming',
-          ),
+          if (_isLoadingAppointments)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_todayAppointments.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 48,
+                    color: isDark ? Colors.white24 : Colors.grey[300],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No appointments today',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white54 : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._todayAppointments.take(3).map((appointment) {
+              return _buildAppointmentCardFromModel(appointment, isDark);
+            }),
 
           const SizedBox(height: 24),
 
           // Patient Requests Section
-          _buildSectionHeader('New Patient Requests', onSeeAll: () {}),
+          _buildSectionHeader('New Patient Requests', onSeeAll: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AppointmentsScreen()),
+            );
+          }),
           const SizedBox(height: 12),
 
-          _buildPatientRequestCard(
-            patientName: 'Binod Poudel',
-            reason: 'General checkup and consultation',
-            preferredTime: 'Tomorrow, 2:00 PM',
-          ),
-          _buildPatientRequestCard(
-            patientName: 'Maya Tamang',
-            reason: 'Recurring headaches',
-            preferredTime: 'This week',
-          ),
+          if (_pendingRequests.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.pending_outlined,
+                    size: 48,
+                    color: isDark ? Colors.white24 : Colors.grey[300],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No pending requests',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white54 : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._pendingRequests.take(2).map((appointment) {
+              return _buildPatientRequestCardFromAppointment(appointment, isDark);
+            }),
 
           const SizedBox(height: 24),
 
@@ -483,107 +626,128 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     );
   }
 
-  Widget _buildAppointmentCard({
-    required String patientName,
-    required String time,
-    required String type,
-    required String status,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  /// Build appointment card from Appointment model
+  Widget _buildAppointmentCardFromModel(Appointment appointment, bool isDark) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
-              child: Text(
-                patientName[0],
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryNavyBlue,
+      child: InkWell(
+        onTap: () {
+          // Navigate to appointment details or start consultation
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AppointmentsScreen()),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
+                child: Text(
+                  appointment.patientName.isNotEmpty 
+                      ? appointment.patientName[0].toUpperCase() 
+                      : 'P',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryNavyBlue,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    patientName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appointment.patientName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: isDark ? Colors.white54 : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        time,
-                        style: TextStyle(
-                          fontSize: 13,
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          size: 14,
                           color: isDark ? Colors.white54 : AppColors.textSecondary,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        type.contains('Video') ? Icons.videocam : Icons.person,
-                        size: 14,
-                        color: isDark ? Colors.white54 : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        type,
-                        style: TextStyle(
-                          fontSize: 13,
+                        const SizedBox(width: 4),
+                        Text(
+                          appointment.formattedTime,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white54 : AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          appointment.type == 'video' 
+                              ? Icons.videocam 
+                              : appointment.type == 'voice'
+                                  ? Icons.phone
+                                  : Icons.chat,
+                          size: 14,
                           color: isDark ? Colors.white54 : AppColors.textSecondary,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.successGreen,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                        const SizedBox(width: 4),
+                        Text(
+                          appointment.type == 'video' 
+                              ? 'Video' 
+                              : appointment.type == 'voice'
+                                  ? 'Voice'
+                                  : 'Chat',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white54 : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              child: const Text(
-                'Start',
-                style: TextStyle(fontSize: 13),
+              ElevatedButton(
+                onPressed: appointment.canJoin 
+                    ? () {
+                        // TODO: Navigate to consultation screen
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Starting ${appointment.type} consultation...'),
+                          ),
+                        );
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: appointment.canJoin 
+                      ? AppColors.successGreen 
+                      : Colors.grey,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  appointment.canJoin ? 'Start' : 'Upcoming',
+                  style: const TextStyle(fontSize: 13),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildPatientRequestCard({
-    required String patientName,
-    required String reason,
-    required String preferredTime,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
+  /// Build patient request card from Appointment model
+  Widget _buildPatientRequestCardFromAppointment(Appointment appointment, bool isDark) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -596,12 +760,15 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                  backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                   child: Text(
-                    patientName[0],
+                    appointment.patientName.isNotEmpty 
+                        ? appointment.patientName[0].toUpperCase() 
+                        : 'P',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.orange,
+                      color: AppColors.primaryNavyBlue,
+                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -611,18 +778,22 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        patientName,
+                        appointment.patientName,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
+                          fontSize: 15,
                           color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        'Preferred: $preferredTime',
+                        appointment.symptoms ?? 'No symptoms provided',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: isDark ? Colors.white54 : AppColors.textSecondary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -630,34 +801,97 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              reason,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white70 : AppColors.textSecondary,
-              ),
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: isDark ? Colors.white54 : AppColors.textSecondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${appointment.formattedDate} at ${appointment.formattedTime}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      try {
+                        await _databaseService.updateAppointmentStatus(
+                          appointment.id,
+                          'confirmed',
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Appointment confirmed'),
+                              backgroundColor: AppColors.successGreen,
+                            ),
+                          );
+                          await _loadAppointments();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: AppColors.secondaryCrimsonRed,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.successGreen,
+                      side: const BorderSide(color: AppColors.successGreen),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    child: const Text('Accept'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      try {
+                        await _databaseService.cancelAppointment(
+                          appointment.id,
+                          'Declined by doctor',
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Appointment declined'),
+                              backgroundColor: AppColors.secondaryCrimsonRed,
+                            ),
+                          );
+                          await _loadAppointments();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: AppColors.secondaryCrimsonRed,
+                            ),
+                          );
+                        }
+                      }
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.secondaryCrimsonRed,
                       side: const BorderSide(color: AppColors.secondaryCrimsonRed),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                     child: const Text('Decline'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.successGreen,
-                    ),
-                    child: const Text('Accept'),
                   ),
                 ),
               ],
@@ -667,6 +901,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       ),
     );
   }
+
 
   Widget _buildQuickActionCard({
     required IconData icon,

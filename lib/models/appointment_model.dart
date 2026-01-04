@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Appointment {
   final String id;
   final String patientId;
@@ -65,6 +67,44 @@ class Appointment {
 
   /// Create Appointment from Firestore Map
   factory Appointment.fromMap(Map<String, dynamic> map) {
+    // Handle both 'dateTime' and 'appointmentTime' fields for compatibility
+    final dateTimeStr = map['dateTime'] ?? map['appointmentTime'];
+    if (dateTimeStr == null) {
+      throw Exception('Missing dateTime or appointmentTime in appointment data');
+    }
+    
+    // Handle Timestamp objects from Firestore
+    DateTime dateTime;
+    if (dateTimeStr is Timestamp) {
+      dateTime = dateTimeStr.toDate();
+    } else if (dateTimeStr is String) {
+      dateTime = DateTime.parse(dateTimeStr);
+    } else {
+      throw Exception('Invalid dateTime format: $dateTimeStr');
+    }
+    
+    // Handle createdAt (could be Timestamp or String)
+    DateTime createdAt;
+    final createdAtValue = map['createdAt'];
+    if (createdAtValue is Timestamp) {
+      createdAt = createdAtValue.toDate();
+    } else if (createdAtValue is String) {
+      createdAt = DateTime.parse(createdAtValue);
+    } else {
+      createdAt = DateTime.now();
+    }
+    
+    // Handle updatedAt (could be Timestamp, String, or null)
+    DateTime? updatedAt;
+    final updatedAtValue = map['updatedAt'];
+    if (updatedAtValue != null) {
+      if (updatedAtValue is Timestamp) {
+        updatedAt = updatedAtValue.toDate();
+      } else if (updatedAtValue is String) {
+        updatedAt = DateTime.parse(updatedAtValue);
+      }
+    }
+    
     return Appointment(
       id: map['id'] ?? '',
       patientId: map['patientId'] ?? '',
@@ -73,14 +113,14 @@ class Appointment {
       doctorName: map['doctorName'] ?? '',
       doctorPhotoUrl: map['doctorPhotoUrl'],
       doctorSpecialty: map['doctorSpecialty'] ?? '',
-      dateTime: DateTime.parse(map['dateTime']),
+      dateTime: dateTime,
       type: map['type'] ?? 'video',
       status: map['status'] ?? 'pending',
       symptoms: map['symptoms'],
       notes: map['notes'],
       consultationFee: (map['consultationFee'] ?? 0).toDouble(),
-      createdAt: DateTime.parse(map['createdAt']),
-      updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
       cancellationReason: map['cancellationReason'],
       rating: map['rating']?.toDouble(),
       review: map['review'],
@@ -132,8 +172,17 @@ class Appointment {
 
   /// Check if appointment is upcoming
   bool get isUpcoming {
-    return (status == 'pending' || status == 'confirmed') && 
-           dateTime.isAfter(DateTime.now());
+    if (status == 'cancelled' || status == 'completed') {
+      return false;
+    }
+    return dateTime.isAfter(DateTime.now());
+  }
+  
+  /// Check if appointment is past
+  bool get isPast {
+    return dateTime.isBefore(DateTime.now()) || 
+           status == 'completed' || 
+           status == 'cancelled';
   }
 
   /// Check if appointment is today

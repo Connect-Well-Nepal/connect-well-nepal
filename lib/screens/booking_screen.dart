@@ -186,30 +186,82 @@ class _BookingScreenState extends State<BookingScreen> {
 
   /// Step 1: Doctor Selection (if not pre-selected)
   Widget _buildDoctorSelectionStep(bool isDark) {
-    final doctors = getSampleDoctors();
+    return FutureBuilder<List<Doctor>>(
+      future: _loadDoctors(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          'Select a Doctor',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Choose from available healthcare providers',
-          style: TextStyle(
-            fontSize: 14,
-            color: isDark ? Colors.grey[400] : AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 20),
-        
-        ...doctors.where((d) => d.isAvailable && d.isVerified).map((doctor) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                const SizedBox(height: 16),
+                Text('Error loading doctors'),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => setState(() {}),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final doctors = snapshot.data ?? [];
+
+        if (doctors.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
+                const SizedBox(height: 16),
+                Text(
+                  'No doctors available',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDark ? Colors.white54 : AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please check back later',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white38 : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'Select a Doctor',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Choose from available healthcare providers',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.grey[400] : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            ...doctors.map((doctor) {
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -227,7 +279,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   children: [
                     CircleAvatar(
                       radius: 32,
-                      backgroundColor: AppColors.primaryNavyBlue.withOpacity(0.1),
+                      backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
                       backgroundImage: doctor.photoUrl != null 
                           ? NetworkImage(doctor.photoUrl!) 
                           : null,
@@ -292,8 +344,98 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
           );
         }),
-      ],
+          ],
+        );
+      },
     );
+  }
+
+  /// Load doctors from database
+  Future<List<Doctor>> _loadDoctors() async {
+    try {
+      final doctors = await _databaseService.getVerifiedDoctors();
+      
+      // Convert UserModel to Doctor model
+      return doctors.map((user) {
+        // Parse available days
+        List<String> availableDays = [];
+        if (user.availableDays != null) {
+          availableDays = user.availableDays!;
+        } else {
+          // Default to weekdays if not specified
+          availableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        }
+        
+        // Parse time slots from available time range
+        List<TimeSlot> timeSlots = [];
+        if (user.availableTimeStart != null && user.availableTimeEnd != null) {
+          timeSlots = _generateTimeSlots(
+            user.availableTimeStart!,
+            user.availableTimeEnd!,
+          );
+        } else {
+          timeSlots = _getDefaultTimeSlots();
+        }
+        
+        return Doctor(
+          id: user.id,
+          name: user.name,
+          specialization: user.specialty ?? 'General Physician',
+          experience: user.yearsOfExperience ?? 0,
+          rating: 4.5, // Default rating, should be calculated from reviews
+          photoUrl: user.profileImageUrl,
+          isVerified: user.isVerifiedDoctor,
+          bio: user.bio,
+          qualifications: user.qualification != null ? [user.qualification!] : null,
+          clinicName: user.hospitalAffiliation,
+          languages: ['English', 'Nepali'], // Default, should be stored in user model
+          availableDays: availableDays,
+          timeSlots: timeSlots,
+          totalReviews: 0, // Should be calculated from reviews
+          consultationFee: user.consultationFee ?? 500.0,
+          isAvailable: true,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading doctors: $e');
+      // Fallback to sample doctors
+      return getSampleDoctors();
+    }
+  }
+
+  /// Generate time slots from time range
+  List<TimeSlot> _generateTimeSlots(String startTime, String endTime) {
+    try {
+      final startParts = startTime.split(':');
+      final endParts = endTime.split(':');
+      if (startParts.length < 2 || endParts.length < 2) {
+        throw Exception('Invalid time format');
+      }
+      final startHour = int.parse(startParts[0]);
+      final startMinute = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+      
+      final start = startHour * 60 + startMinute;
+      final end = endHour * 60 + endMinute;
+      
+      List<TimeSlot> slots = [];
+      for (int time = start; time < end; time += 30) {
+        final hour = (time ~/ 60).toString().padLeft(2, '0');
+        final minute = (time % 60).toString().padLeft(2, '0');
+        final slotStart = '$hour:$minute';
+        final slotEnd = '${((time + 30) ~/ 60).toString().padLeft(2, '0')}:${((time + 30) % 60).toString().padLeft(2, '0')}';
+        slots.add(TimeSlot(
+          startTime: slotStart,
+          endTime: slotEnd,
+          isAvailable: true, // Explicitly set as available
+        ));
+      }
+      return slots;
+    } catch (e) {
+      debugPrint('Error generating time slots: $e');
+      return _getDefaultTimeSlots();
+    }
   }
 
   /// Step 2: Date Selection
@@ -369,7 +511,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   shape: BoxShape.circle,
                 ),
                 todayDecoration: BoxDecoration(
-                  color: AppColors.primaryNavyBlue.withOpacity(0.3),
+                  color: AppColors.primaryNavyBlue.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 markerDecoration: BoxDecoration(
@@ -416,7 +558,7 @@ class _BookingScreenState extends State<BookingScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryNavyBlue.withOpacity(0.1),
+            color: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -598,7 +740,7 @@ class _BookingScreenState extends State<BookingScreen> {
             color: isSelected
                 ? AppColors.primaryNavyBlue
                 : isDark
-                    ? AppColors.primaryNavyBlue.withOpacity(0.1)
+                    ? AppColors.primaryNavyBlue.withValues(alpha: 0.1)
                     : AppColors.backgroundOffWhite,
             border: Border.all(
               color: isSelected
@@ -722,7 +864,7 @@ class _BookingScreenState extends State<BookingScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryNavyBlue.withOpacity(0.1),
+            color: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -817,7 +959,7 @@ class _BookingScreenState extends State<BookingScreen> {
         color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -959,6 +1101,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
       // Combine date and time
       final timeParts = _selectedTimeSlot!.startTime.split(':');
+      if (timeParts.length < 2) {
+        throw Exception('Invalid time slot format');
+      }
       final appointmentDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -967,7 +1112,8 @@ class _BookingScreenState extends State<BookingScreen> {
         int.parse(timeParts[1]),
       );
 
-      // Create appointment data
+      // Create appointment data (use both dateTime and appointmentTime for compatibility)
+      final dateTimeStr = appointmentDateTime.toIso8601String();
       final appointmentData = {
         'patientId': currentUser.id,
         'patientName': currentUser.name,
@@ -975,7 +1121,8 @@ class _BookingScreenState extends State<BookingScreen> {
         'doctorName': _selectedDoctor!.name,
         'doctorPhotoUrl': _selectedDoctor!.photoUrl,
         'doctorSpecialty': _selectedDoctor!.specialization,
-        'appointmentTime': appointmentDateTime.toIso8601String(),
+        'dateTime': dateTimeStr, // Primary field
+        'appointmentTime': dateTimeStr, // Backward compatibility
         'type': _selectedConsultationType,
         'status': 'pending',
         'symptoms': _symptomsController.text.trim(),
@@ -1067,18 +1214,18 @@ class _BookingScreenState extends State<BookingScreen> {
   /// Get default time slots
   List<TimeSlot> _getDefaultTimeSlots() {
     return [
-      TimeSlot(startTime: '09:00', endTime: '09:30'),
-      TimeSlot(startTime: '09:30', endTime: '10:00'),
-      TimeSlot(startTime: '10:00', endTime: '10:30'),
-      TimeSlot(startTime: '10:30', endTime: '11:00'),
-      TimeSlot(startTime: '11:00', endTime: '11:30'),
-      TimeSlot(startTime: '11:30', endTime: '12:00'),
-      TimeSlot(startTime: '14:00', endTime: '14:30'),
-      TimeSlot(startTime: '14:30', endTime: '15:00'),
-      TimeSlot(startTime: '15:00', endTime: '15:30'),
-      TimeSlot(startTime: '15:30', endTime: '16:00'),
-      TimeSlot(startTime: '16:00', endTime: '16:30'),
-      TimeSlot(startTime: '16:30', endTime: '17:00'),
+      TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
+      TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
+      TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
+      TimeSlot(startTime: '10:30', endTime: '11:00', isAvailable: true),
+      TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: true),
+      TimeSlot(startTime: '11:30', endTime: '12:00', isAvailable: true),
+      TimeSlot(startTime: '14:00', endTime: '14:30', isAvailable: true),
+      TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: true),
+      TimeSlot(startTime: '15:00', endTime: '15:30', isAvailable: true),
+      TimeSlot(startTime: '15:30', endTime: '16:00', isAvailable: true),
+      TimeSlot(startTime: '16:00', endTime: '16:30', isAvailable: true),
+      TimeSlot(startTime: '16:30', endTime: '17:00', isAvailable: true),
     ];
   }
 

@@ -430,12 +430,16 @@ class _MainScreenState extends State<MainScreen> {
         title: const Text('Connect Well Nepal'),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.settings_outlined),
+          icon: Image.asset(
+            'assets/logos/logo_icon.png',
+            width: 32,
+            height: 32,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.local_hospital);
+            },
+          ),
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            );
+            // Logo is just decorative, can navigate to home or do nothing
           },
         ),
         actions: [
@@ -448,6 +452,16 @@ class _MainScreenState extends State<MainScreen> {
               );
             },
             tooltip: 'Messages',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+            tooltip: 'Settings',
           ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),

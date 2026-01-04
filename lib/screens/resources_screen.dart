@@ -40,19 +40,30 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   }
 
   Future<void> _loadBookmarks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final bookmarks = prefs.getStringList('bookmarked_articles') ?? [];
-    setState(() {
-      _bookmarkedArticleIds.addAll(bookmarks);
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bookmarks = prefs.getStringList('bookmarked_articles') ?? [];
+      if (mounted) {
+        setState(() {
+          _bookmarkedArticleIds.addAll(bookmarks);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading bookmarks: $e');
+    }
   }
 
   Future<void> _saveBookmarks() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('bookmarked_articles', _bookmarkedArticleIds.toList());
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('bookmarked_articles', _bookmarkedArticleIds.toList());
+    } catch (e) {
+      debugPrint('Error saving bookmarks: $e');
+    }
   }
 
   void _toggleBookmark(String articleId) {
+    if (!mounted) return;
     setState(() {
       if (_bookmarkedArticleIds.contains(articleId)) {
         _bookmarkedArticleIds.remove(articleId);
@@ -215,7 +226,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                 ),
               );
             },
-          )).toList(),
+          )),
 
           // Add this "Empty State" check for a professional touch
           if (filteredArticles.isEmpty)

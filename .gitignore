@@ -37,6 +37,8 @@ migrate_working_dir/
 /coverage/
 *.g.dart
 *.freezed.dart
+*.dart_tool/
+.flutter-plugins-dependencies.json
 
 # Symbolication related
 app.*.symbols
@@ -56,8 +58,9 @@ app.*.map.json
 *.pem
 android/.gradle/
 android/local.properties
-android/gradlew
-android/gradlew.bat
+# Note: gradlew and gradlew.bat SHOULD be tracked (they're version-controlled)
+# android/gradlew
+# android/gradlew.bat
 android/gradle/wrapper/gradle-wrapper.jar
 android/key.properties
 android/app/google-services.json
@@ -68,6 +71,9 @@ android/captures/
 android/app/release/
 android/app/debug/
 android/app/profile/
+android/.cxx/
+android/.externalNativeBuild/
+android/app/.cxx/
 
 # iOS related
 **/ios/**/*.mode1v3
@@ -172,7 +178,13 @@ lcov.info
 *~
 ~*
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # Logs
 logs/
@@ -187,3 +199,32 @@ test_driver/
 
 # Exceptions (files that should be tracked)
 !.gitkeep
+!**/.gitkeep
+
+# Additional Flutter build artifacts
+*.lock
+*.dart.js
+*.dart.js.map
+*.info.json
+
+# Generated files
+**/generated/
+**/GeneratedPluginRegistrant.*
+
+# Local configuration files
+local.properties
+*.local.properties
+
+# FVM (Flutter Version Management)
+.fvm/
+
+# Fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+# App-specific
+*.png.bak
+*.jpg.bak
+flutter_*.png

@@ -265,6 +265,10 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: isDark ? const Color(0xFF1B263B) : Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Row(
           children: [
             Container(

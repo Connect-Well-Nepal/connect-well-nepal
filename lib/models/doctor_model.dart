@@ -57,10 +57,13 @@ class TimeSlot {
   bool isPast(DateTime date) {
     try {
       final parts = startTime.split(':');
+      if (parts.length < 2) return false;
       final hour = int.parse(parts[0]);
       final minute = int.parse(parts[1]);
       final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
-      return slotTime.isBefore(DateTime.now());
+      final now = DateTime.now();
+      // Only consider past if the slot time is before now (with 5 minute buffer)
+      return slotTime.isBefore(now.subtract(const Duration(minutes: 5)));
     } catch (e) {
       return false;
     }
@@ -157,17 +160,17 @@ List<Doctor> getSampleDoctors() {
 /// Default time slots
 List<TimeSlot> _getDefaultTimeSlots() {
   return [
-    TimeSlot(startTime: '09:00', endTime: '09:30'),
-    TimeSlot(startTime: '09:30', endTime: '10:00'),
-    TimeSlot(startTime: '10:00', endTime: '10:30'),
-    TimeSlot(startTime: '10:30', endTime: '11:00'),
-    TimeSlot(startTime: '11:00', endTime: '11:30'),
-    TimeSlot(startTime: '11:30', endTime: '12:00'),
-    TimeSlot(startTime: '14:00', endTime: '14:30'),
-    TimeSlot(startTime: '14:30', endTime: '15:00'),
-    TimeSlot(startTime: '15:00', endTime: '15:30'),
-    TimeSlot(startTime: '15:30', endTime: '16:00'),
-    TimeSlot(startTime: '16:00', endTime: '16:30'),
-    TimeSlot(startTime: '16:30', endTime: '17:00'),
+    TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
+    TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
+    TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
+    TimeSlot(startTime: '10:30', endTime: '11:00', isAvailable: true),
+    TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: true),
+    TimeSlot(startTime: '11:30', endTime: '12:00', isAvailable: true),
+    TimeSlot(startTime: '14:00', endTime: '14:30', isAvailable: true),
+    TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: true),
+    TimeSlot(startTime: '15:00', endTime: '15:30', isAvailable: true),
+    TimeSlot(startTime: '15:30', endTime: '16:00', isAvailable: true),
+    TimeSlot(startTime: '16:00', endTime: '16:30', isAvailable: true),
+    TimeSlot(startTime: '16:30', endTime: '17:00', isAvailable: true),
   ];
 }

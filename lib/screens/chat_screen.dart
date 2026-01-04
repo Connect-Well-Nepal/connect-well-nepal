@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connect_well_nepal/models/chat_model.dart';
 import 'package:connect_well_nepal/services/chat_service.dart';
+import 'package:connect_well_nepal/services/database_service.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 
@@ -113,7 +114,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     isPatient 
                         ? (widget.conversation.doctorSpecialty ?? 'Doctor')
                         : 'Patient',
-                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+                    style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
                   ),
                 ],
               ),
@@ -263,7 +264,7 @@ class _ChatScreenState extends State<ChatScreen> {
               color: isDark ? Colors.grey[900] : Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -345,7 +346,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -559,6 +560,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () async {
+                          final navigator = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
                           final user = context.read<AppProvider>().currentUser;
                           if (user == null) return;
                           
@@ -570,6 +573,16 @@ class _ChatScreenState extends State<ChatScreen> {
                             selectedTime.minute,
                           );
                           
+                          // Determine appointment type
+                          String appointmentTypeCode = 'chat';
+                          if (appointmentType.toLowerCase().contains('video')) {
+                            appointmentTypeCode = 'video';
+                          } else if (appointmentType.toLowerCase().contains('voice') || 
+                                     appointmentType.toLowerCase().contains('call')) {
+                            appointmentTypeCode = 'voice';
+                          }
+                          
+                          // Send appointment message in chat
                           await _chatService.sendAppointmentMessage(
                             conversationId: widget.conversation.id,
                             senderId: user.id,
@@ -578,12 +591,38 @@ class _ChatScreenState extends State<ChatScreen> {
                             appointmentType: appointmentType,
                           );
                           
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Appointment request sent!')),
-                            );
+                          // Also create actual appointment in database
+                          try {
+                            final appointmentData = {
+                              'patientId': widget.conversation.patientId,
+                              'patientName': widget.conversation.patientName,
+                              'doctorId': widget.conversation.doctorId,
+                              'doctorName': widget.conversation.doctorName,
+                              'doctorPhotoUrl': widget.conversation.doctorImage,
+                              'doctorSpecialty': widget.conversation.doctorSpecialty ?? 'General Physician',
+                              'dateTime': appointmentDateTime.toIso8601String(),
+                              'appointmentTime': appointmentDateTime.toIso8601String(),
+                              'type': appointmentTypeCode,
+                              'status': 'pending',
+                              'symptoms': 'Appointment requested via chat',
+                              'consultationFee': 500.0, // Default fee
+                            };
+                            
+                            final databaseService = DatabaseService();
+                            await databaseService.createAppointment(appointmentData);
+                          } catch (e) {
+                            debugPrint('Error creating appointment from chat: $e');
+                            // Don't show error to user, message was sent successfully
                           }
+                          
+                          if (!mounted) return;
+                          navigator.pop();
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Appointment request sent!'),
+                              backgroundColor: AppColors.successGreen,
+                            ),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryNavyBlue,
@@ -648,6 +687,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: () async {
                       if (prescriptionController.text.trim().isEmpty) return;
                       
+                      final navigator = Navigator.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
                       final user = context.read<AppProvider>().currentUser;
                       if (user == null) return;
                       
@@ -658,12 +699,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         prescriptionDetails: prescriptionController.text.trim(),
                       );
                       
-                      if (mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Prescription sent!')),
-                        );
-                      }
+                      if (!mounted) return;
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Prescription sent!')),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryNavyBlue,

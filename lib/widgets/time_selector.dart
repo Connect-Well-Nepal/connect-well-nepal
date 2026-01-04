@@ -127,7 +127,7 @@ class _TimeSlotChip extends StatelessWidget {
           color: isSelected
               ? AppColors.primaryNavyBlue
               : isDark
-                  ? AppColors.primaryNavyBlue.withOpacity(0.1)
+                  ? AppColors.primaryNavyBlue.withValues(alpha: 0.1)
                   : AppColors.backgroundOffWhite,
           border: Border.all(
             color: isSelected

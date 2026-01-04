@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:connect_well_nepal/firebase_options.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/splash_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
@@ -16,19 +18,20 @@ import 'package:flutter/foundation.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase (optional - app works without it for guest users)
+  // Initialize Firebase
   try {
-    // Try to import and initialize Firebase if available
-    // If firebase_options.dart doesn't exist, the app will still work
-    // Firebase will be initialized lazily when needed
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     if (kDebugMode) {
-      debugPrint('Firebase initialization skipped - will initialize when needed');
+      debugPrint('✅ Firebase initialized successfully');
     }
   } catch (e) {
     if (kDebugMode) {
-      debugPrint('Firebase not configured: $e');
+      debugPrint('❌ Firebase initialization failed: $e');
       debugPrint('App will run in guest mode without Firebase');
     }
+    // Continue without Firebase - app can work in guest mode
   }
   
   runApp(

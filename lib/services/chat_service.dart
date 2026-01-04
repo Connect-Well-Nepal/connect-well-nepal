@@ -72,16 +72,36 @@ class ChatService {
 
   /// Get all conversations for a user (works for both doctors and patients)
   Stream<List<ConversationModel>> getConversations(String userId) {
-    return _conversationsRef
-        .where(Filter.or(
-          Filter('patientId', isEqualTo: userId),
-          Filter('doctorId', isEqualTo: userId),
-        ))
-        .orderBy('lastMessageTime', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ConversationModel.fromFirestore(doc))
-            .toList());
+    try {
+      return _conversationsRef
+          .where(Filter.or(
+            Filter('patientId', isEqualTo: userId),
+            Filter('doctorId', isEqualTo: userId),
+          ))
+          .orderBy('lastMessageTime', descending: true)
+          .snapshots()
+          .map((snapshot) {
+            try {
+              return snapshot.docs
+                  .map((doc) {
+                    try {
+                      return ConversationModel.fromFirestore(doc);
+                    } catch (e) {
+                      debugPrint('Error parsing conversation ${doc.id}: $e');
+                      return null;
+                    }
+                  })
+                  .whereType<ConversationModel>()
+                  .toList();
+            } catch (e) {
+              debugPrint('Error mapping conversations: $e');
+              return <ConversationModel>[];
+            }
+          });
+    } catch (e) {
+      debugPrint('Error getting conversations stream: $e');
+      return Stream.value(<ConversationModel>[]);
+    }
   }
 
   /// Get messages for a conversation (real-time stream)
@@ -122,11 +142,23 @@ class ChatService {
       // Add message
       final docRef = await _messagesRef.add(message.toFirestore());
 
-      // Update conversation with last message
-      await _conversationsRef.doc(conversationId).update({
-        'lastMessage': content,
-        'lastMessageTime': Timestamp.fromDate(DateTime.now()),
-      });
+      // Get conversation to update last message and increment unread count
+      final conversationDoc = await _conversationsRef.doc(conversationId).get();
+      if (conversationDoc.exists) {
+        // Update conversation with last message and increment unread count for the other user
+        await _conversationsRef.doc(conversationId).update({
+          'lastMessage': content,
+          'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+          // Increment unread count for the other participant
+          'unreadCount': FieldValue.increment(1),
+        });
+      } else {
+        // Fallback if conversation doesn't exist
+        await _conversationsRef.doc(conversationId).update({
+          'lastMessage': content,
+          'lastMessageTime': Timestamp.fromDate(DateTime.now()),
+        });
+      }
 
       return message.copyWith(id: docRef.id);
     } catch (e) {
@@ -150,10 +182,13 @@ class ChatService {
       }
       await batch.commit();
 
-      // Reset unread count
-      await _conversationsRef.doc(conversationId).update({
-        'unreadCount': 0,
-      });
+      // Reset unread count for the reader
+      final conversationDoc = await _conversationsRef.doc(conversationId).get();
+      if (conversationDoc.exists) {
+        await _conversationsRef.doc(conversationId).update({
+          'unreadCount': 0,
+        });
+      }
     } catch (e) {
       debugPrint('Error marking messages as read: $e');
     }

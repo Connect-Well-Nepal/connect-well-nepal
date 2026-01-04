@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connect_well_nepal/models/chat_model.dart';
 import 'package:connect_well_nepal/services/chat_service.dart';
+import 'package:connect_well_nepal/services/database_service.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/chat_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
@@ -17,6 +18,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
+  final DatabaseService _databaseService = DatabaseService();
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +197,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       child: ListTile(
         leading: CircleAvatar(
           radius: 28,
-          backgroundColor: AppColors.primaryNavyBlue.withOpacity(0.1),
+          backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
           backgroundImage: otherImage != null ? NetworkImage(otherImage) : null,
           child: otherImage == null
               ? Text(
@@ -296,29 +298,106 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  void _showNewChatDialog(UserModel currentUser) {
-    // Demo doctors/patients for starting new conversation
-    final demoContacts = currentUser.role == UserRole.patient
-        ? [
+  void _showNewChatDialog(UserModel currentUser) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    List<Map<String, dynamic>> contacts = [];
+    
+    try {
+      if (currentUser.role == UserRole.patient) {
+        // Get all verified doctors from database
+        final doctors = await _databaseService.getVerifiedDoctors();
+        contacts = doctors.map((doctor) => {
+          'id': doctor.id,
+          'name': doctor.name,
+          'specialty': doctor.specialty ?? 'General Physician',
+          'image': doctor.profileImageUrl,
+        }).toList();
+        
+        // If no doctors found, use sample data as fallback
+        if (contacts.isEmpty) {
+          contacts = [
             {'id': 'doc_1', 'name': 'Dr. Rajesh Sharma', 'specialty': 'General Physician'},
             {'id': 'doc_2', 'name': 'Dr. Anjali Thapa', 'specialty': 'Cardiologist'},
             {'id': 'doc_3', 'name': 'Dr. Prakash Paudel', 'specialty': 'Pediatrician'},
             {'id': 'doc_4', 'name': 'Dr. Sunita Gurung', 'specialty': 'Dermatologist'},
-          ]
-        : [
+          ];
+        }
+      } else {
+        // For doctors: Get patients who have appointments with this doctor
+        final appointments = await _databaseService.getUserAppointments(
+          currentUser.id,
+          isDoctor: true,
+        );
+        
+        // Extract unique patient IDs
+        final patientIds = appointments
+            .map((apt) => apt['patientId'] as String?)
+            .whereType<String>()
+            .toSet()
+            .toList();
+        
+        // Get patient details
+        for (final patientId in patientIds) {
+          try {
+            final patientDoc = await _databaseService.getUser(patientId);
+            if (patientDoc != null) {
+              contacts.add({
+                'id': patientDoc.id,
+                'name': patientDoc.name,
+                'info': 'Patient',
+                'image': patientDoc.profileImageUrl,
+              });
+            }
+          } catch (e) {
+            debugPrint('Error fetching patient $patientId: $e');
+          }
+        }
+        
+        // If no patients found, use sample data as fallback
+        if (contacts.isEmpty) {
+          contacts = [
             {'id': 'pat_1', 'name': 'Ramesh Adhikari', 'info': 'Patient'},
             {'id': 'pat_2', 'name': 'Sita Sharma', 'info': 'Patient'},
             {'id': 'pat_3', 'name': 'Krishna Tamang', 'info': 'Patient'},
           ];
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading contacts: $e');
+      // Use sample data as fallback
+      contacts = currentUser.role == UserRole.patient
+          ? [
+              {'id': 'doc_1', 'name': 'Dr. Rajesh Sharma', 'specialty': 'General Physician'},
+              {'id': 'doc_2', 'name': 'Dr. Anjali Thapa', 'specialty': 'Cardiologist'},
+              {'id': 'doc_3', 'name': 'Dr. Prakash Paudel', 'specialty': 'Pediatrician'},
+              {'id': 'doc_4', 'name': 'Dr. Sunita Gurung', 'specialty': 'Dermatologist'},
+            ]
+          : [
+              {'id': 'pat_1', 'name': 'Ramesh Adhikari', 'info': 'Patient'},
+              {'id': 'pat_2', 'name': 'Sita Sharma', 'info': 'Patient'},
+              {'id': 'pat_3', 'name': 'Krishna Tamang', 'info': 'Patient'},
+            ];
+    } finally {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+      }
+    }
 
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+      builder: (sheetContext) {
+        final isDark = Theme.of(sheetContext).brightness == Brightness.dark;
         return DraggableScrollableSheet(
           initialChildSize: 0.6,
           maxChildSize: 0.9,
@@ -353,21 +432,62 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: demoContacts.length,
-                    itemBuilder: (context, index) {
-                      final contact = demoContacts[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.primaryNavyBlue.withOpacity(0.1),
-                          child: Text(
-                            contact['name']![0],
-                            style: TextStyle(
-                              color: AppColors.primaryNavyBlue,
-                              fontWeight: FontWeight.bold,
+                  child: contacts.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.people_outline,
+                                  size: 64,
+                                  color: isDark ? Colors.white24 : Colors.grey[300],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No contacts available',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: isDark ? Colors.white54 : AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  currentUser.role == UserRole.patient
+                                      ? 'No verified doctors found'
+                                      : 'No patients with appointments found',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark ? Colors.white38 : AppColors.textSecondary,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           ),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          itemCount: contacts.length,
+                          itemBuilder: (context, index) {
+                            final contact = contacts[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
+                          backgroundImage: contact['image'] != null 
+                              ? NetworkImage(contact['image']!) 
+                              : null,
+                          child: contact['image'] == null
+                              ? Text(
+                                  contact['name']![0].toUpperCase(),
+                                  style: TextStyle(
+                                    color: AppColors.primaryNavyBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
                         ),
                         title: Text(
                           contact['name']!,
@@ -387,7 +507,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           color: AppColors.primaryNavyBlue,
                         ),
                         onTap: () async {
-                          Navigator.pop(context);
+                          Navigator.pop(sheetContext);
+                          
+                          if (!mounted) return;
+                          final navigator = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
                           
                           try {
                             ConversationModel conversation;
@@ -399,12 +523,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 patientImage: currentUser.profileImageUrl,
                                 doctorId: contact['id']!,
                                 doctorName: contact['name']!,
-                                doctorSpecialty: contact['specialty'],
+                                doctorSpecialty: contact['specialty'] ?? contact['info'],
                               );
                             } else {
                               conversation = await _chatService.getOrCreateConversation(
                                 patientId: contact['id']!,
                                 patientName: contact['name']!,
+                                patientImage: contact['image'],
                                 doctorId: currentUser.id,
                                 doctorName: currentUser.name,
                                 doctorImage: currentUser.profileImageUrl,
@@ -412,20 +537,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               );
                             }
                             
-                            if (mounted) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ChatScreen(conversation: conversation),
-                                ),
-                              );
-                            }
+                            if (!mounted) return;
+                            navigator.push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(conversation: conversation),
+                              ),
+                            );
                           } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error starting chat: $e')),
-                              );
-                            }
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              SnackBar(content: Text('Error starting chat: $e')),
+                            );
                           }
                         },
                       );
