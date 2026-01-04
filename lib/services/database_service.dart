@@ -125,7 +125,11 @@ class DatabaseService {
     required DateTime expiresAt,
   }) async {
     try {
-      await _db.collection('verification_codes').doc(userId).set({
+      if (!isFirebaseAvailable) {
+        throw Exception('Firebase not initialized');
+      }
+      final db = _firestore!;
+      await db.collection('verification_codes').doc(userId).set({
         'code': code,
         'email': email,
         'expiresAt': expiresAt.toIso8601String(),

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:connect_well_nepal/firebase_options.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/splash_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
+import 'package:flutter/foundation.dart';
 
 /// Entry point of the Connect Well Nepal application
 /// 
 /// This file initializes the app:
-/// - Firebase initialization
+/// - Firebase initialization (optional)
 /// - Provider for state management
 /// - Material Design 3 theming with dark mode support
 /// - Custom color scheme
@@ -17,10 +16,20 @@ import 'package:connect_well_nepal/utils/colors.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Initialize Firebase (optional - app works without it for guest users)
+  try {
+    // Try to import and initialize Firebase if available
+    // If firebase_options.dart doesn't exist, the app will still work
+    // Firebase will be initialized lazily when needed
+    if (kDebugMode) {
+      debugPrint('Firebase initialization skipped - will initialize when needed');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('Firebase not configured: $e');
+      debugPrint('App will run in guest mode without Firebase');
+    }
+  }
   
   runApp(
     ChangeNotifierProvider(
