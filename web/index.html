@@ -31,8 +31,12 @@
 
   <title>Connect Well Nepal - Your Telehealth Partner</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.19.0.js"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+  <script src="agora_web_interop.js"></script>
+  <div id="local-video-container" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
+  <div id="remote-streams-container" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
 </body>
 </html>

@@ -1,24 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
+import 'package:connect_well_nepal/screens/video_call_screen.dart';
+import 'package:connect_well_nepal/services/video_call_service.dart';
+import 'package:provider/provider.dart';
 
-/// ConsultationScreen - Video/Voice consultation interface
-/// 
-/// Features:
-/// - Start video consultation
-/// - Start voice call
-/// - Chat with doctor
-/// - View doctor profile
-/// 
-/// TODO (Team Member 2): Implement video/voice call integration
-/// Consider using: Agora, Jitsi, or Firebase WebRTC
-class ConsultationScreen extends StatelessWidget {
+/// ConsultationScreen - Video consultation interface (Week 1-3)
+///
+/// Week 1-3 Tasks - Video Call Integration:
+/// - Research and integrate video SDK (Agora)
+/// - Create video_call_screen.dart ✓
+/// - Implement video controls (mute, video on/off, flip camera) ✓
+/// - Add in-call UI (timer, participant info) ✓
+class ConsultationScreen extends StatefulWidget {
   const ConsultationScreen({super.key});
+
+  @override
+  State<ConsultationScreen> createState() => _ConsultationScreenState();
+}
+
+class _ConsultationScreenState extends State<ConsultationScreen> {
   
+  @override
+  Widget build(BuildContext context) {
+    return _ConsultationScreenContent();
+  }
+}
+
+class _ConsultationScreenContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Start Consultation'),
+        title: const Text('Video Consultation'),
         centerTitle: true,
       ),
       body: Padding(
@@ -28,7 +41,7 @@ class ConsultationScreen extends StatelessWidget {
           children: [
             // Header
             const Text(
-              'Choose Your Consultation Type',
+              'Video Consultation',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -36,63 +49,42 @@ class ConsultationScreen extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
-            const SizedBox(height: 32),
-            
+
+            const SizedBox(height: 16),
+
+            const Text(
+              'Connect face-to-face with your doctor through secure video calling',
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: 48),
+
             // Video Consultation Card
             _buildConsultationCard(
               context,
               icon: Icons.video_call,
-              title: 'Video Consultation',
-              description: 'Face-to-face consultation with doctor',
+              title: 'Start Video Call',
+              description: 'Begin your video consultation with the doctor',
               color: AppColors.primaryNavyBlue,
               onTap: () {
-                _showComingSoonDialog(context, 'Video Consultation');
+                _startVideoConsultation(context);
               },
             ),
-            
-            const SizedBox(height: 16),
-            
-            // Voice Call Card
-            _buildConsultationCard(
-              context,
-              icon: Icons.phone,
-              title: 'Voice Call',
-              description: 'Audio consultation with doctor',
-              color: AppColors.secondaryCrimsonRed,
-              onTap: () {
-                _showComingSoonDialog(context, 'Voice Call');
-              },
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Chat Consultation Card
-            _buildConsultationCard(
-              context,
-              icon: Icons.chat_bubble,
-              title: 'Chat Consultation',
-              description: 'Text-based consultation',
-              color: AppColors.successGreen,
-              onTap: () {
-                _showComingSoonDialog(context, 'Chat Consultation');
-              },
-            ),
-            
+
             const Spacer(),
-            
-            // Emergency Button
-            OutlinedButton.icon(
-              onPressed: () {
-                _showEmergencyDialog(context);
-              },
-              icon: const Icon(Icons.emergency),
-              label: const Text('Emergency Contacts'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.secondaryCrimsonRed,
-                side: const BorderSide(color: AppColors.secondaryCrimsonRed),
-                padding: const EdgeInsets.symmetric(vertical: 16),
+
+            // Info Text
+            const Text(
+              'Make sure you have a stable internet connection and are in a quiet environment for the best experience.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -158,52 +150,27 @@ class ConsultationScreen extends StatelessWidget {
     );
   }
   
-  void _showComingSoonDialog(BuildContext context, String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(feature),
-        content: Text('$feature will be available soon!\n\nOur team is working on integrating video/voice call functionality.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  void _showEmergencyDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.emergency, color: AppColors.secondaryCrimsonRed),
-            SizedBox(width: 8),
-            Text('Emergency Contacts'),
-          ],
+  void _startVideoConsultation(BuildContext context) {
+    // Week 1-3: Video Call Integration
+    // Using Agora RTC SDK for video calling
+
+    // For demo purposes - in production, these would come from:
+    // - Appointment booking system
+    // - Doctor selection
+    // - Server-generated tokens
+    const String channelId = 'demo_channel_123';
+    const String token = ''; // Empty token for testing (token-less mode)
+    const String doctorName = 'Dr. Sarita Sharma';
+    const String doctorSpecialty = 'General Physician';
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => VideoCallScreen(
+          channelId: channelId,
+          token: token,
+          doctorName: doctorName,
+          doctorSpecialty: doctorSpecialty,
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('🚑 Ambulance: 102'),
-            SizedBox(height: 8),
-            Text('🏥 Police: 100'),
-            SizedBox(height: 8),
-            Text('🔥 Fire: 101'),
-            SizedBox(height: 8),
-            Text('☎️ Nepal Red Cross: 1130'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
