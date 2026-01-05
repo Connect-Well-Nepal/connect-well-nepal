@@ -466,6 +466,26 @@ class AppProvider extends ChangeNotifier {
     return result['success'] == true && result['needsRoleSelection'] != true;
   }
 
+  /// Refresh current user data from Firestore
+  /// Useful when user data is updated (e.g., admin status changed)
+  Future<void> refreshUser() async {
+    final firebaseUser = _authService.currentUser;
+    if (firebaseUser == null) {
+      debugPrint('⚠️ Cannot refresh user: No Firebase user found');
+      return;
+    }
+    
+    try {
+      final dbService = DatabaseService();
+      final userModel = await dbService.getUser(firebaseUser.uid);
+      _currentUser = userModel;
+      notifyListeners();
+      debugPrint('✅ User data refreshed successfully');
+    } catch (e) {
+      debugPrint('❌ Error refreshing user: $e');
+    }
+  }
+
   /// Logout user
   Future<void> logout() async {
     _isLoading = true;

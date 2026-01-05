@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/services/chat_service.dart';
+import 'package:connect_well_nepal/services/database_service.dart';
+import 'package:connect_well_nepal/models/doctor_model.dart';
 import 'package:connect_well_nepal/screens/chat_screen.dart';
+import 'package:connect_well_nepal/screens/booking_screen.dart';
+import 'package:connect_well_nepal/screens/doctor_profile_screen.dart';
 
 /// AllDoctorsScreen - Shows all available doctors
 class AllDoctorsScreen extends StatefulWidget {
@@ -16,144 +20,144 @@ class AllDoctorsScreen extends StatefulWidget {
 class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
   String _selectedSpecialty = 'All';
   String _searchQuery = '';
+  List<Doctor> _allDoctors = [];
+  bool _isLoading = true;
   
-  // Demo doctors data
-  final List<Map<String, dynamic>> _allDoctors = [
-    {
-      'name': 'Dr. Rajesh Sharma',
-      'specialty': 'General Physician',
-      'experience': '15 years',
-      'rating': 4.8,
-      'reviews': 245,
-      'available': true,
-      'fee': 'Rs. 500',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Anjali Thapa',
-      'specialty': 'Cardiologist',
-      'experience': '12 years',
-      'rating': 4.9,
-      'reviews': 189,
-      'available': true,
-      'fee': 'Rs. 1000',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Prakash Paudel',
-      'specialty': 'Pediatrician',
-      'experience': '10 years',
-      'rating': 4.7,
-      'reviews': 312,
-      'available': false,
-      'fee': 'Rs. 600',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Sunita Gurung',
-      'specialty': 'Dermatologist',
-      'experience': '8 years',
-      'rating': 4.6,
-      'reviews': 156,
-      'available': true,
-      'fee': 'Rs. 800',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Arun Shrestha',
-      'specialty': 'Orthopedic',
-      'experience': '20 years',
-      'rating': 4.9,
-      'reviews': 421,
-      'available': true,
-      'fee': 'Rs. 1200',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Maya Rai',
-      'specialty': 'Gynecologist',
-      'experience': '14 years',
-      'rating': 4.8,
-      'reviews': 267,
-      'available': true,
-      'fee': 'Rs. 900',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Bikash KC',
-      'specialty': 'Neurologist',
-      'experience': '18 years',
-      'rating': 4.7,
-      'reviews': 198,
-      'available': false,
-      'fee': 'Rs. 1500',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Sita Maharjan',
-      'specialty': 'ENT Specialist',
-      'experience': '11 years',
-      'rating': 4.5,
-      'reviews': 134,
-      'available': true,
-      'fee': 'Rs. 700',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Ram Bahadur',
-      'specialty': 'General Physician',
-      'experience': '25 years',
-      'rating': 4.9,
-      'reviews': 567,
-      'available': true,
-      'fee': 'Rs. 400',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Puja Adhikari',
-      'specialty': 'Psychiatrist',
-      'experience': '9 years',
-      'rating': 4.6,
-      'reviews': 89,
-      'available': true,
-      'fee': 'Rs. 1100',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Dipak Karki',
-      'specialty': 'Cardiologist',
-      'experience': '16 years',
-      'rating': 4.8,
-      'reviews': 234,
-      'available': false,
-      'fee': 'Rs. 1200',
-      'image': null,
-    },
-    {
-      'name': 'Dr. Nisha Tamang',
-      'specialty': 'Pediatrician',
-      'experience': '7 years',
-      'rating': 4.4,
-      'reviews': 98,
-      'available': true,
-      'fee': 'Rs. 550',
-      'image': null,
-    },
-  ];
+  final DatabaseService _databaseService = DatabaseService();
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadDoctors();
+  }
+  
+  /// Load real doctors from database
+  Future<void> _loadDoctors() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final doctors = await _databaseService.getVerifiedDoctors();
+      
+      // Convert UserModel to Doctor model
+      _allDoctors = doctors.map((user) {
+        // Parse available days
+        List<String> availableDays = [];
+        if (user.availableDays != null) {
+          availableDays = user.availableDays!;
+        } else {
+          availableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        }
+        
+        // Parse time slots from available time range
+        List<TimeSlot> timeSlots = [];
+        if (user.availableTimeStart != null && user.availableTimeEnd != null) {
+          timeSlots = _generateTimeSlots(
+            user.availableTimeStart!,
+            user.availableTimeEnd!,
+          );
+        } else {
+          timeSlots = _getDefaultTimeSlots();
+        }
+        
+        return Doctor(
+          id: user.id,
+          name: user.name,
+          specialization: user.specialty ?? 'General Physician',
+          experience: user.yearsOfExperience ?? 0,
+          rating: 4.5, // Default rating, should be calculated from reviews
+          photoUrl: user.profileImageUrl,
+          isVerified: user.isVerifiedDoctor,
+          bio: user.bio,
+          qualifications: user.qualification != null ? [user.qualification!] : null,
+          clinicName: user.hospitalAffiliation,
+          languages: ['English', 'Nepali'],
+          availableDays: availableDays,
+          timeSlots: timeSlots,
+          totalReviews: 0,
+          consultationFee: user.consultationFee ?? 500.0,
+          isAvailable: true,
+          isAvailableNow: user.isAvailableNow,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading doctors: $e');
+      // Show empty state if error
+      _allDoctors = [];
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  /// Generate time slots from time range
+  List<TimeSlot> _generateTimeSlots(String startTime, String endTime) {
+    try {
+      final startParts = startTime.split(':');
+      final endParts = endTime.split(':');
+      if (startParts.length < 2 || endParts.length < 2) {
+        return _getDefaultTimeSlots();
+      }
+      final startHour = int.parse(startParts[0]);
+      final startMinute = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+      
+      final start = startHour * 60 + startMinute;
+      final end = endHour * 60 + endMinute;
+      
+      List<TimeSlot> slots = [];
+      for (int time = start; time < end; time += 30) {
+        final hour = (time ~/ 60).toString().padLeft(2, '0');
+        final minute = (time % 60).toString().padLeft(2, '0');
+        final slotStart = '$hour:$minute';
+        final slotEnd = '${((time + 30) ~/ 60).toString().padLeft(2, '0')}:${((time + 30) % 60).toString().padLeft(2, '0')}';
+        slots.add(TimeSlot(
+          startTime: slotStart,
+          endTime: slotEnd,
+          isAvailable: true,
+        ));
+      }
+      return slots;
+    } catch (e) {
+      debugPrint('Error generating time slots: $e');
+      return _getDefaultTimeSlots();
+    }
+  }
+  
+  /// Get default time slots
+  List<TimeSlot> _getDefaultTimeSlots() {
+    return [
+      TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
+      TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
+      TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
+      TimeSlot(startTime: '10:30', endTime: '11:00', isAvailable: true),
+      TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: true),
+      TimeSlot(startTime: '11:30', endTime: '12:00', isAvailable: true),
+      TimeSlot(startTime: '14:00', endTime: '14:30', isAvailable: true),
+      TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: true),
+      TimeSlot(startTime: '15:00', endTime: '15:30', isAvailable: true),
+      TimeSlot(startTime: '15:30', endTime: '16:00', isAvailable: true),
+      TimeSlot(startTime: '16:00', endTime: '16:30', isAvailable: true),
+      TimeSlot(startTime: '16:30', endTime: '17:00', isAvailable: true),
+    ];
+  }
 
   List<String> get _specialties {
-    final specs = _allDoctors.map((d) => d['specialty'] as String).toSet().toList();
+    final specs = _allDoctors.map((d) => d.specialization).toSet().toList();
     specs.sort();
     return ['All', ...specs];
   }
 
-  List<Map<String, dynamic>> get _filteredDoctors {
+  List<Doctor> get _filteredDoctors {
     return _allDoctors.where((doctor) {
       final matchesSpecialty = _selectedSpecialty == 'All' || 
-          doctor['specialty'] == _selectedSpecialty;
+          doctor.specialization == _selectedSpecialty;
       final matchesSearch = _searchQuery.isEmpty ||
-          doctor['name'].toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          doctor['specialty'].toLowerCase().contains(_searchQuery.toLowerCase());
+          doctor.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          doctor.specialization.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesSpecialty && matchesSearch;
     }).toList();
   }
@@ -244,28 +248,61 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
 
           // Doctors list
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filteredDoctors.length,
-              itemBuilder: (context, index) {
-                final doctor = _filteredDoctors[index];
-                return _buildDoctorCard(doctor, isDark);
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredDoctors.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: isDark ? Colors.white24 : Colors.grey[300],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No doctors found',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isDark ? Colors.white54 : AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _loadDoctors,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _filteredDoctors.length,
+                        itemBuilder: (context, index) {
+                          final doctor = _filteredDoctors[index];
+                          return _buildDoctorCard(doctor, isDark);
+                        },
+                      ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDoctorCard(Map<String, dynamic> doctor, bool isDark) {
+  Widget _buildDoctorCard(Doctor doctor, bool isDark) {
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          _showDoctorDetails(doctor);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DoctorProfileScreen(doctor: doctor),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -276,14 +313,17 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
               CircleAvatar(
                 radius: 30,
                 backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
-                child: Text(
-                  doctor['name'].split(' ').last[0],
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryNavyBlue,
-                  ),
-                ),
+                backgroundImage: doctor.photoUrl != null ? NetworkImage(doctor.photoUrl!) : null,
+                child: doctor.photoUrl == null
+                    ? Text(
+                        doctor.name.isNotEmpty ? doctor.name[0].toUpperCase() : 'D',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryNavyBlue,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 16),
               
@@ -296,7 +336,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            doctor['name'],
+                            doctor.name,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -304,30 +344,50 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                             ),
                           ),
                         ),
+                        // Availability Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: doctor['available'] 
+                            color: (doctor.isAvailable || doctor.isAvailableNow)
                                 ? AppColors.successGreen.withValues(alpha: 0.1)
-                                : Colors.red.withValues(alpha: 0.1),
+                                : Colors.grey.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(
-                            doctor['available'] ? 'Available' : 'Busy',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: doctor['available'] 
-                                  ? AppColors.successGreen 
-                                  : Colors.red,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: (doctor.isAvailable || doctor.isAvailableNow)
+                                      ? AppColors.successGreen
+                                      : Colors.grey,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                (doctor.isAvailable || doctor.isAvailableNow) ? 'Available' : 'Busy',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: (doctor.isAvailable || doctor.isAvailableNow)
+                                      ? AppColors.successGreen
+                                      : Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      doctor['specialty'],
+                      doctor.specialization,
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.primaryNavyBlue,
@@ -340,7 +400,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                         Icon(Icons.work_outline, size: 14, color: isDark ? Colors.white54 : AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Text(
-                          doctor['experience'],
+                          '${doctor.experienceYears} yrs',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark ? Colors.white54 : AppColors.textSecondary,
@@ -350,7 +410,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                         Icon(Icons.star, size: 14, color: Colors.amber),
                         const SizedBox(width: 4),
                         Text(
-                          '${doctor['rating']} (${doctor['reviews']})',
+                          '${doctor.rating} (${doctor.totalReviews})',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark ? Colors.white54 : AppColors.textSecondary,
@@ -363,7 +423,7 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          doctor['fee'],
+                          'Rs. ${doctor.consultationFee.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -389,9 +449,12 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
                             const SizedBox(width: 8),
                             // Book button
                             ElevatedButton(
-                              onPressed: doctor['available'] ? () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Booking appointment with ${doctor['name']}...')),
+                              onPressed: (doctor.isAvailable || doctor.isAvailableNow) ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => BookingScreen(preSelectedDoctor: doctor),
+                                  ),
                                 );
                               } : null,
                               style: ElevatedButton.styleFrom(
@@ -418,155 +481,8 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
     );
   }
 
-  void _showDoctorDetails(Map<String, dynamic> doctor) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          maxChildSize: 0.9,
-          minChildSize: 0.5,
-          expand: false,
-          builder: (context, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Doctor header
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
-                        child: Text(
-                          doctor['name'].split(' ').last[0],
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryNavyBlue,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              doctor['name'],
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : AppColors.textPrimary,
-                              ),
-                            ),
-                            Text(
-                              doctor['specialty'],
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.primaryNavyBlue,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Stats
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStat('Experience', doctor['experience'], Icons.work),
-                      _buildStat('Rating', '${doctor['rating']}★', Icons.star),
-                      _buildStat('Reviews', '${doctor['reviews']}', Icons.rate_review),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  
-                  // Fee
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Consultation Fee',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDark ? Colors.white70 : AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        doctor['fee'],
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryNavyBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Book button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: doctor['available'] ? () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Booking appointment with ${doctor['name']}...')),
-                        );
-                      } : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryNavyBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        doctor['available'] ? 'Book Appointment' : 'Currently Unavailable',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   /// Start a chat with a doctor
-  Future<void> _startChat(Map<String, dynamic> doctor) async {
+  Future<void> _startChat(Doctor doctor) async {
     final appProvider = context.read<AppProvider>();
     final currentUser = appProvider.currentUser;
     
@@ -585,9 +501,9 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
         patientId: currentUser.id,
         patientName: currentUser.name,
         patientImage: currentUser.profileImageUrl,
-        doctorId: doctor['id'] ?? 'doc_${doctor['name'].hashCode}',
-        doctorName: doctor['name'],
-        doctorSpecialty: doctor['specialty'],
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+        doctorSpecialty: doctor.specialization,
       );
       
       if (mounted) {
@@ -607,28 +523,4 @@ class _AllDoctorsScreenState extends State<AllDoctorsScreen> {
     }
   }
 
-  Widget _buildStat(String label, String value, IconData icon) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.primaryNavyBlue, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : AppColors.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white54 : AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
 }

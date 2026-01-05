@@ -41,9 +41,11 @@ class UserModel {
   final String? bio;
   final double? consultationFee;
   final bool isVerifiedDoctor;
+  final bool isAdmin; // Admin role for verifying doctors
   final List<String>? availableDays;
   final String? availableTimeStart;
   final String? availableTimeEnd;
+  final bool isAvailableNow; // Current availability status
 
   UserModel({
     required this.id,
@@ -70,9 +72,11 @@ class UserModel {
     this.bio,
     this.consultationFee,
     this.isVerifiedDoctor = false,
+    this.isAdmin = false,
     this.availableDays,
     this.availableTimeStart,
     this.availableTimeEnd,
+    this.isAvailableNow = false,
   }) : createdAt = createdAt ?? DateTime.now();
 
   /// Check if user is a patient
@@ -129,9 +133,11 @@ class UserModel {
     String? bio,
     double? consultationFee,
     bool? isVerifiedDoctor,
+    bool? isAdmin,
     List<String>? availableDays,
     String? availableTimeStart,
     String? availableTimeEnd,
+    bool? isAvailableNow,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -156,9 +162,11 @@ class UserModel {
       bio: bio ?? this.bio,
       consultationFee: consultationFee ?? this.consultationFee,
       isVerifiedDoctor: isVerifiedDoctor ?? this.isVerifiedDoctor,
+      isAdmin: isAdmin ?? this.isAdmin,
       availableDays: availableDays ?? this.availableDays,
       availableTimeStart: availableTimeStart ?? this.availableTimeStart,
       availableTimeEnd: availableTimeEnd ?? this.availableTimeEnd,
+      isAvailableNow: isAvailableNow ?? this.isAvailableNow,
     );
   }
 
@@ -187,9 +195,11 @@ class UserModel {
       'bio': bio,
       'consultationFee': consultationFee,
       'isVerifiedDoctor': isVerifiedDoctor,
+      'isAdmin': isAdmin,
       'availableDays': availableDays,
       'availableTimeStart': availableTimeStart,
       'availableTimeEnd': availableTimeEnd,
+      'isAvailableNow': isAvailableNow,
     };
   }
 
@@ -225,11 +235,13 @@ class UserModel {
       bio: map['bio'],
       consultationFee: map['consultationFee']?.toDouble(),
       isVerifiedDoctor: map['isVerifiedDoctor'] ?? false,
+      isAdmin: map['isAdmin'] ?? false,
       availableDays: map['availableDays'] != null
           ? List<String>.from(map['availableDays'])
           : null,
       availableTimeStart: map['availableTimeStart'],
       availableTimeEnd: map['availableTimeEnd'],
+      isAvailableNow: map['isAvailableNow'] ?? false,
     );
   }
 

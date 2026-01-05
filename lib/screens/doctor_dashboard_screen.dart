@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/settings_screen.dart';
 import 'package:connect_well_nepal/screens/appointment_screen.dart';
+import 'package:connect_well_nepal/screens/schedule_management_screen.dart';
 import 'package:connect_well_nepal/services/database_service.dart';
 import 'package:connect_well_nepal/models/appointment_model.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
@@ -25,13 +27,29 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   final DatabaseService _databaseService = DatabaseService();
   List<Appointment> _todayAppointments = [];
   List<Appointment> _pendingRequests = [];
+  List<Map<String, dynamic>> _patients = [];
   bool _isLoadingAppointments = true;
   int _totalPatients = 0;
+  DateTime? _lastRefreshTime;
 
   @override
   void initState() {
     super.initState();
     _loadAppointments();
+    _lastRefreshTime = DateTime.now();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh if it's been more than 2 seconds since last refresh
+    // This prevents infinite loops but allows refresh when screen becomes visible
+    final now = DateTime.now();
+    if (_lastRefreshTime == null || 
+        now.difference(_lastRefreshTime!).inSeconds > 2) {
+      _lastRefreshTime = now;
+      _loadAppointments();
+    }
   }
 
   /// Load appointments for doctor
@@ -62,17 +80,54 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           .map((data) {
             try {
               final dateTimeStr = data['dateTime'] ?? data['appointmentTime'];
-              if (dateTimeStr == null) return null;
+              if (dateTimeStr == null) {
+                debugPrint('⚠️ Appointment missing dateTime: ${data['id']}');
+                return null;
+              }
+              
+              // Handle Timestamp objects from Firestore
+              String? dateTimeStrFinal;
+              if (dateTimeStr is Timestamp) {
+                dateTimeStrFinal = dateTimeStr.toDate().toIso8601String();
+              } else if (dateTimeStr is String) {
+                dateTimeStrFinal = dateTimeStr;
+              } else {
+                debugPrint('⚠️ Invalid dateTime format: $dateTimeStr');
+                return null;
+              }
+              
+              // Handle createdAt
+              String? createdAtStr;
+              final createdAtValue = data['createdAt'];
+              if (createdAtValue is Timestamp) {
+                createdAtStr = createdAtValue.toDate().toIso8601String();
+              } else if (createdAtValue is String) {
+                createdAtStr = createdAtValue;
+              } else {
+                createdAtStr = DateTime.now().toIso8601String();
+              }
+              
+              // Handle updatedAt
+              String? updatedAtStr;
+              final updatedAtValue = data['updatedAt'];
+              if (updatedAtValue != null) {
+                if (updatedAtValue is Timestamp) {
+                  updatedAtStr = updatedAtValue.toDate().toIso8601String();
+                } else if (updatedAtValue is String) {
+                  updatedAtStr = updatedAtValue;
+                }
+              }
               
               return Appointment.fromMap({
                 ...data,
-                'dateTime': dateTimeStr,
-                'appointmentTime': dateTimeStr,
-                'createdAt': data['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
-                'updatedAt': data['updatedAt']?.toString(),
+                'dateTime': dateTimeStrFinal,
+                'appointmentTime': dateTimeStrFinal,
+                'createdAt': createdAtStr,
+                'updatedAt': updatedAtStr,
               });
             } catch (e) {
-              debugPrint('Error parsing appointment: $e');
+              debugPrint('❌ Error parsing appointment: $e');
+              debugPrint('   Data: $data');
               return null;
             }
           })
@@ -98,14 +153,39 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           .toList();
       _pendingRequests.sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
-      // Count unique patients
+      // Count unique patients and load patient details
       final patientIds = appointments
           .map((apt) => apt.patientId)
           .toSet();
       _totalPatients = patientIds.length;
+      
+      // Load patient details
+      _patients = [];
+      for (final patientId in patientIds) {
+        try {
+          final patientData = await _databaseService.getUser(patientId);
+          if (patientData != null) {
+            _patients.add({
+              'id': patientId,
+              'name': patientData.name,
+              'email': patientData.email,
+              'photoUrl': patientData.profileImageUrl,
+              'phone': patientData.phone,
+            });
+          }
+        } catch (e) {
+          debugPrint('Error loading patient $patientId: $e');
+        }
+      }
 
     } catch (e) {
-      debugPrint('Error loading appointments: $e');
+      debugPrint('❌ Error loading appointments in doctor dashboard: $e');
+      debugPrint('   Stack trace: ${StackTrace.current}');
+      // Set empty lists on error
+      _todayAppointments = [];
+      _pendingRequests = [];
+      _patients = [];
+      _totalPatients = 0;
     } finally {
       if (mounted) {
         setState(() {
@@ -425,8 +505,11 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                   label: 'Manage\nSchedule',
                   color: AppColors.primaryNavyBlue,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Schedule management coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ScheduleManagementScreen(),
+                      ),
                     );
                   },
                 ),
@@ -542,6 +625,50 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ],
             ),
           ),
+
+          const SizedBox(height: 24),
+
+          // Patients Section
+          _buildSectionHeader('My Patients', onSeeAll: null),
+          const SizedBox(height: 12),
+
+          if (_patients.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E2A3A) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.people_outline,
+                    size: 48,
+                    color: isDark ? Colors.white24 : Colors.grey[300],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No patients yet',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white54 : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              height: 120,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _patients.length,
+                itemBuilder: (context, index) {
+                  final patient = _patients[index];
+                  return _buildPatientCard(patient, isDark);
+                },
+              ),
+            ),
 
           const SizedBox(height: 24),
         ],
@@ -745,6 +872,48 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     );
   }
 
+
+  /// Build patient card
+  Widget _buildPatientCard(Map<String, dynamic> patient, bool isDark) {
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 12),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: AppColors.primaryNavyBlue.withValues(alpha: 0.1),
+            backgroundImage: patient['photoUrl'] != null 
+                ? NetworkImage(patient['photoUrl']) 
+                : null,
+            child: patient['photoUrl'] == null
+                ? Text(
+                    patient['name'] != null && patient['name'].toString().isNotEmpty
+                        ? patient['name'].toString()[0].toUpperCase()
+                        : 'P',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryNavyBlue,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            patient['name'] ?? 'Unknown',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : AppColors.textPrimary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Build patient request card from Appointment model
   Widget _buildPatientRequestCardFromAppointment(Appointment appointment, bool isDark) {

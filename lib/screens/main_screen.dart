@@ -4,7 +4,6 @@ import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/profile_screen.dart';
 import 'package:connect_well_nepal/screens/appointment_screen.dart';
 import 'package:connect_well_nepal/screens/resources_screen.dart';
-import 'package:connect_well_nepal/screens/settings_screen.dart';
 import 'package:connect_well_nepal/screens/doctor_dashboard_screen.dart';
 import 'package:connect_well_nepal/screens/ai_assistant_screen.dart';
 import 'package:connect_well_nepal/screens/all_doctors_screen.dart';
@@ -16,6 +15,8 @@ import 'package:connect_well_nepal/models/doctor_model.dart';
 import 'package:connect_well_nepal/models/place_model.dart';
 import 'package:connect_well_nepal/services/location_service.dart';
 import 'package:connect_well_nepal/services/osm_places_service.dart';
+import 'package:connect_well_nepal/services/database_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// MainScreen - Primary navigation shell of the app
 /// 
@@ -38,17 +39,179 @@ class _MainScreenState extends State<MainScreen> {
   // Services
   final LocationService _locationService = LocationService();
   final OSMPlacesService _placesService = OSMPlacesService();
+  final DatabaseService _databaseService = DatabaseService();
 
   // Places data
   List<PlaceModel> _nearbyHospitals = [];
   List<PlaceModel> _nearbyClinics = [];
   bool _isLoadingPlaces = true;
   String? _locationError;
+  
+  // Doctors data
+  List<Doctor> _availableDoctors = [];
+  bool _isLoadingDoctors = false;
 
   @override
   void initState() {
     super.initState();
     _loadNearbyPlaces();
+    _loadDoctors();
+  }
+  
+  /// Load real doctors from database
+  Future<void> _loadDoctors() async {
+    setState(() {
+      _isLoadingDoctors = true;
+    });
+    
+    try {
+      final doctors = await _databaseService.getVerifiedDoctors();
+      
+      // Convert UserModel to Doctor model
+      _availableDoctors = await Future.wait(doctors.map((user) async {
+        // Parse available days
+        List<String> availableDays = [];
+        if (user.availableDays != null) {
+          availableDays = user.availableDays!;
+        } else {
+          availableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        }
+        
+        // Parse time slots from available time range
+        List<TimeSlot> timeSlots = [];
+        if (user.availableTimeStart != null && user.availableTimeEnd != null) {
+          timeSlots = _generateTimeSlots(
+            user.availableTimeStart!,
+            user.availableTimeEnd!,
+          );
+        } else {
+          timeSlots = _getDefaultTimeSlots();
+        }
+        
+        // Check if doctor has confirmed appointments happening now
+        bool isBusyNow = false;
+        try {
+          final appointmentsData = await _databaseService.getUserAppointments(
+            user.id,
+            isDoctor: true,
+          );
+          
+          final now = DateTime.now();
+          for (final aptData in appointmentsData) {
+            try {
+              final dateTimeStr = aptData['dateTime'] ?? aptData['appointmentTime'];
+              if (dateTimeStr == null) continue;
+              
+              DateTime aptDateTime;
+              if (dateTimeStr is Timestamp) {
+                aptDateTime = dateTimeStr.toDate();
+              } else if (dateTimeStr is String) {
+                aptDateTime = DateTime.parse(dateTimeStr);
+              } else {
+                continue;
+              }
+              
+              final status = aptData['status'] ?? 'pending';
+              // Check if there's a confirmed appointment happening now (within 30 minutes)
+              if (status == 'confirmed') {
+                final difference = aptDateTime.difference(now);
+                if (difference.inMinutes >= -15 && difference.inMinutes <= 30) {
+                  isBusyNow = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              debugPrint('Error checking appointment time: $e');
+            }
+          }
+        } catch (e) {
+          debugPrint('Error checking doctor busy status: $e');
+        }
+        
+        return Doctor(
+          id: user.id,
+          name: user.name,
+          specialization: user.specialty ?? 'General Physician',
+          experience: user.yearsOfExperience ?? 0,
+          rating: 4.5, // Default rating, should be calculated from reviews
+          photoUrl: user.profileImageUrl,
+          isVerified: user.isVerifiedDoctor,
+          bio: user.bio,
+          qualifications: user.qualification != null ? [user.qualification!] : null,
+          clinicName: user.hospitalAffiliation,
+          languages: ['English', 'Nepali'],
+          availableDays: availableDays,
+          timeSlots: timeSlots,
+          totalReviews: 0,
+          consultationFee: user.consultationFee ?? 500.0,
+          isAvailable: !isBusyNow && (user.isAvailableNow || true), // Available if not busy and has availability set
+          isAvailableNow: user.isAvailableNow && !isBusyNow, // Available now only if not busy
+        );
+      }));
+    } catch (e) {
+      debugPrint('Error loading doctors: $e');
+      // Show empty list if error
+      _availableDoctors = [];
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingDoctors = false;
+        });
+      }
+    }
+  }
+  
+  /// Generate time slots from time range
+  List<TimeSlot> _generateTimeSlots(String startTime, String endTime) {
+    try {
+      final startParts = startTime.split(':');
+      final endParts = endTime.split(':');
+      if (startParts.length < 2 || endParts.length < 2) {
+        return _getDefaultTimeSlots();
+      }
+      final startHour = int.parse(startParts[0]);
+      final startMinute = int.parse(startParts[1]);
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+      
+      final start = startHour * 60 + startMinute;
+      final end = endHour * 60 + endMinute;
+      
+      List<TimeSlot> slots = [];
+      for (int time = start; time < end; time += 30) {
+        final hour = (time ~/ 60).toString().padLeft(2, '0');
+        final minute = (time % 60).toString().padLeft(2, '0');
+        final slotStart = '$hour:$minute';
+        final slotEnd = '${((time + 30) ~/ 60).toString().padLeft(2, '0')}:${((time + 30) % 60).toString().padLeft(2, '0')}';
+        slots.add(TimeSlot(
+          startTime: slotStart,
+          endTime: slotEnd,
+          isAvailable: true,
+        ));
+      }
+      return slots;
+    } catch (e) {
+      debugPrint('Error generating time slots: $e');
+      return _getDefaultTimeSlots();
+    }
+  }
+  
+  /// Get default time slots
+  List<TimeSlot> _getDefaultTimeSlots() {
+    return [
+      TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: true),
+      TimeSlot(startTime: '09:30', endTime: '10:00', isAvailable: true),
+      TimeSlot(startTime: '10:00', endTime: '10:30', isAvailable: true),
+      TimeSlot(startTime: '10:30', endTime: '11:00', isAvailable: true),
+      TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: true),
+      TimeSlot(startTime: '11:30', endTime: '12:00', isAvailable: true),
+      TimeSlot(startTime: '14:00', endTime: '14:30', isAvailable: true),
+      TimeSlot(startTime: '14:30', endTime: '15:00', isAvailable: true),
+      TimeSlot(startTime: '15:00', endTime: '15:30', isAvailable: true),
+      TimeSlot(startTime: '15:30', endTime: '16:00', isAvailable: true),
+      TimeSlot(startTime: '16:00', endTime: '16:30', isAvailable: true),
+      TimeSlot(startTime: '16:30', endTime: '17:00', isAvailable: true),
+    ];
   }
 
   /// Load nearby hospitals and clinics using OSM (FREE - no billing required!)
@@ -453,25 +616,6 @@ class _MainScreenState extends State<MainScreen> {
             },
             tooltip: 'Messages',
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-            tooltip: 'Settings',
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Navigate to notifications
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications coming soon!')),
-              );
-            },
-          ),
         ],
       ),
       body: ListView(
@@ -735,35 +879,44 @@ class _MainScreenState extends State<MainScreen> {
           
           const SizedBox(height: 8),
           
-          // Doctor Cards
-          _buildDoctorCard(
-            name: 'Dr. Rajesh Sharma',
-            specialty: 'General Physician',
-            experience: '15 years',
-            rating: 4.8,
-            available: true,
-          ),
-          _buildDoctorCard(
-            name: 'Dr. Anjali Thapa',
-            specialty: 'Cardiologist',
-            experience: '12 years',
-            rating: 4.9,
-            available: true,
-          ),
-          _buildDoctorCard(
-            name: 'Dr. Prakash Paudel',
-            specialty: 'Pediatrician',
-            experience: '10 years',
-            rating: 4.7,
-            available: false,
-          ),
-          _buildDoctorCard(
-            name: 'Dr. Sunita Gurung',
-            specialty: 'Dermatologist',
-            experience: '8 years',
-            rating: 4.6,
-            available: true,
-          ),
+          // Doctor Cards - Load from database
+          if (_isLoadingDoctors)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_availableDoctors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.people_outline,
+                      size: 48,
+                      color: isDark ? Colors.white24 : Colors.grey[300],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No doctors available',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white54 : AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _loadDoctors,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._availableDoctors.take(4).map((doctor) {
+              return _buildDoctorCardFromModel(doctor, isDark);
+            }),
 
           // See more doctors button
           Padding(
@@ -1175,23 +1328,29 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
   
+  /// Build doctor card from Doctor model
+  Widget _buildDoctorCardFromModel(Doctor doctor, bool isDark) {
+    final available = doctor.isAvailable || doctor.isAvailableNow;
+    
+    return _buildDoctorCard(
+      name: doctor.name,
+      specialty: doctor.specialization,
+      experience: '${doctor.experienceYears} years',
+      rating: doctor.rating,
+      available: available,
+      doctor: doctor,
+    );
+  }
+  
   Widget _buildDoctorCard({
     required String name,
     required String specialty,
     required String experience,
     required double rating,
     required bool available,
+    Doctor? doctor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Create Doctor model from card data
-    final doctor = Doctor(
-      id: name.toLowerCase().replaceAll(' ', '_').replaceAll('.', ''),
-      name: name,
-      specialization: specialty,
-      experience: int.tryParse(experience.split(' ')[0]) ?? 0,
-      rating: rating,
-    );
 
     return Card(
       elevation: 2,
@@ -1199,10 +1358,18 @@ class _MainScreenState extends State<MainScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
+          final doctorToShow = doctor ?? Doctor(
+            id: name.toLowerCase().replaceAll(' ', '_').replaceAll('.', ''),
+            name: name,
+            specialization: specialty,
+            experience: int.tryParse(experience.split(' ')[0]) ?? 0,
+            rating: rating,
+            isAvailable: available,
+          );
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => DoctorProfileScreen(doctor: doctor),
+              builder: (context) => DoctorProfileScreen(doctor: doctorToShow),
             ),
           );
         },
@@ -1212,22 +1379,21 @@ class _MainScreenState extends State<MainScreen> {
           child: Row(
             children: [
               // Doctor Avatar
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.primaryNavyBlue.withValues(alpha: 0.3)
-                      : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.person,
-                  size: 32,
-                  color: isDark
-                      ? const Color(0xFF5A7BC0)
-                      : AppColors.primaryNavyBlue,
-                ),
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: isDark
+                    ? AppColors.primaryNavyBlue.withValues(alpha: 0.3)
+                    : AppColors.primaryNavyBlue.withValues(alpha: 0.1),
+                backgroundImage: doctor?.photoUrl != null ? NetworkImage(doctor!.photoUrl!) : null,
+                child: doctor?.photoUrl == null
+                    ? Icon(
+                        Icons.person,
+                        size: 32,
+                        color: isDark
+                            ? const Color(0xFF5A7BC0)
+                            : AppColors.primaryNavyBlue,
+                      )
+                    : null,
               ),
               
               const SizedBox(width: 16),
@@ -1348,11 +1514,52 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
               
-              // Arrow Icon
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: isDark ? Colors.white38 : AppColors.textSecondary,
+              // Book Appointment Button
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton(
+                    onPressed: available
+                        ? () {
+                            final doctorToShow = doctor ?? Doctor(
+                              id: name.toLowerCase().replaceAll(' ', '_').replaceAll('.', ''),
+                              name: name,
+                              specialization: specialty,
+                              experience: int.tryParse(experience.split(' ')[0]) ?? 0,
+                              rating: rating,
+                              isAvailable: available,
+                            );
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DoctorProfileScreen(doctor: doctorToShow),
+                              ),
+                            );
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: available
+                          ? AppColors.primaryNavyBlue
+                          : Colors.grey,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      minimumSize: const Size(100, 36),
+                    ),
+                    child: const Text(
+                      'Book',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1418,6 +1625,11 @@ class _MainScreenState extends State<MainScreen> {
           setState(() {
             _currentIndex = index;
           });
+          // Refresh appointments when appointments tab is selected
+          if (index == 1) {
+            // Trigger refresh by rebuilding the appointments screen
+            // The screen will refresh in didChangeDependencies
+          }
         },
         type: BottomNavigationBarType.fixed,
             selectedItemColor:

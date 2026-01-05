@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../models/appointment_model.dart';
 import '../models/doctor_model.dart';
 import '../utils/colors.dart';
@@ -12,6 +13,7 @@ import '../services/database_service.dart';
 import '../services/local_notification_service.dart';
 import 'booking_screen.dart';
 import 'doctor_profile_screen.dart';
+import 'schedule_management_screen.dart';
 
 /// Main appointments screen showing upcoming and past appointments
 /// Includes tabs for filtering and quick booking action
@@ -29,14 +31,34 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   List<Appointment> _appointments = [];
   bool _isLoading = true;
   
+  // Calendar state for doctors
+  DateTime _focusedDay = DateTime.now();
+  DateTime _selectedDay = DateTime.now();
+  
   final DatabaseService _databaseService = DatabaseService();
   final LocalNotificationService _notificationService = LocalNotificationService();
 
+  DateTime? _lastRefreshTime;
+  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadAppointments();
+    _lastRefreshTime = DateTime.now();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh if it's been more than 2 seconds since last refresh
+    // This prevents infinite loops but allows refresh when tab is selected
+    final now = DateTime.now();
+    if (_lastRefreshTime == null || 
+        now.difference(_lastRefreshTime!).inSeconds > 2) {
+      _lastRefreshTime = now;
+      _loadAppointments();
+    }
   }
 
   @override
@@ -71,13 +93,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         isDoctor: currentUser.isDoctor,
       );
 
+      debugPrint('📋 Loading appointments for user: ${currentUser.id}, isDoctor: ${currentUser.isDoctor}');
+      debugPrint('📋 Found ${appointmentsData.length} appointment records');
+      
       _appointments = appointmentsData
           .map((data) {
             try {
+              // Ensure id is set
+              final appointmentId = data['id'] ?? '';
+              if (appointmentId.isEmpty) {
+                debugPrint('⚠️ Appointment missing id');
+                return null;
+              }
+              
               // Handle both 'dateTime' and 'appointmentTime' fields
               final dateTimeStr = data['dateTime'] ?? data['appointmentTime'];
               if (dateTimeStr == null) {
-                debugPrint('⚠️ Appointment missing dateTime: ${data['id']}');
+                debugPrint('⚠️ Appointment ${appointmentId} missing dateTime');
                 return null;
               }
               
@@ -89,7 +121,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               } else if (dateTimeValue is String) {
                 dateTimeStrFinal = dateTimeValue;
               } else {
-                debugPrint('⚠️ Invalid dateTime format: $dateTimeValue');
+                debugPrint('⚠️ Invalid dateTime format for ${appointmentId}: $dateTimeValue');
                 return null;
               }
               
@@ -115,13 +147,17 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                 }
               }
               
-              return Appointment.fromMap({
+              final appointment = Appointment.fromMap({
                 ...data,
+                'id': appointmentId, // Ensure id is set
                 'dateTime': dateTimeStrFinal,
                 'appointmentTime': dateTimeStrFinal, // Ensure both are set
                 'createdAt': createdAtStr,
                 'updatedAt': updatedAtStr,
               });
+              
+              debugPrint('✅ Parsed appointment: ${appointment.id}, status: ${appointment.status}, dateTime: ${appointment.dateTime}');
+              return appointment;
             } catch (e) {
               debugPrint('❌ Error parsing appointment: $e');
               debugPrint('   Data: $data');
@@ -130,10 +166,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           })
           .whereType<Appointment>()
           .toList();
+      
+      debugPrint('✅ Successfully loaded ${_appointments.length} appointments');
     } catch (e) {
-      debugPrint('Error loading appointments: $e');
-      // Fallback to sample data
-      _loadSampleAppointments();
+      debugPrint('❌ Error loading appointments: $e');
+      debugPrint('   Stack trace: ${StackTrace.current}');
+      // Don't fallback to sample data - show empty state instead
+      _appointments = [];
     } finally {
       if (mounted) {
         setState(() {
@@ -283,18 +322,18 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            // Upcoming appointments
-            _buildAppointmentsList(
-              appointments: _appointments
-                  .where((apt) => apt.isUpcoming)
-                  .toList(),
-              emptyMessage: isDoctor 
-                  ? 'No upcoming appointments scheduled'
-                  : 'No upcoming appointments',
-              emptyIcon: Icons.calendar_today,
-              isDark: isDark,
-              isDoctor: isDoctor,
-            ),
+            // For doctors: Show calendar view, for patients: Show list
+            isDoctor
+                ? _buildDoctorScheduleView(isDark)
+                : _buildAppointmentsList(
+                    appointments: _appointments
+                        .where((apt) => apt.isUpcoming)
+                        .toList(),
+                    emptyMessage: 'No upcoming appointments',
+                    emptyIcon: Icons.calendar_today,
+                    isDark: isDark,
+                    isDoctor: isDoctor,
+                  ),
             // Past appointments
             _buildAppointmentsList(
               appointments: _appointments
@@ -311,9 +350,22 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         ),
       ),
 
-      // Floating action button - only show for patients
-      floatingActionButton: !isDoctor
+      // Floating action button - show different for doctors vs patients
+      floatingActionButton: isDoctor
           ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ScheduleManagementScreen(),
+                  ),
+                );
+              },
+              backgroundColor: AppColors.primaryNavyBlue,
+              icon: const Icon(Icons.schedule),
+              label: const Text('Manage Schedule'),
+            )
+          : FloatingActionButton.extended(
               onPressed: () async {
                 final result = await Navigator.push(
                   context,
@@ -330,8 +382,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               backgroundColor: AppColors.primaryNavyBlue,
               icon: const Icon(Icons.add),
               label: const Text('Book Appointment'),
-            )
-          : null,
+            ),
     );
   }
 
@@ -982,9 +1033,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Accept Appointment'),
+        title: const Text('Confirm Appointment'),
         content: Text(
-          'Accept appointment with ${appointment.patientName} on ${appointment.formattedDate} at ${appointment.formattedTime}?',
+          'Confirm appointment with ${appointment.patientName} on ${appointment.formattedDate} at ${appointment.formattedTime}?',
         ),
         actions: [
           TextButton(
@@ -1006,7 +1057,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                 if (!mounted) return;
                 messenger.showSnackBar(
                   const SnackBar(
-                    content: Text('Appointment accepted successfully'),
+                    content: Text('Appointment confirmed! Status updated to Booked.'),
                     backgroundColor: AppColors.successGreen,
                   ),
                 );
@@ -1241,5 +1292,168 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       default:
         return type;
     }
+  }
+
+  /// Build calendar view for doctors
+  Widget _buildDoctorScheduleView(bool isDark) {
+    // Get appointments for the selected day
+    final selectedDayAppointments = _appointments.where((apt) {
+      return apt.dateTime.year == _selectedDay.year &&
+          apt.dateTime.month == _selectedDay.month &&
+          apt.dateTime.day == _selectedDay.day;
+    }).toList();
+    
+    return Column(
+      children: [
+        // Calendar
+        Card(
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TableCalendar(
+              firstDay: DateTime.now().subtract(const Duration(days: 30)),
+              lastDay: DateTime.now().add(const Duration(days: 365)),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) {
+                return isSameDay(_selectedDay, day);
+              },
+              onDaySelected: (selectedDay, focusedDay) {
+                if (mounted) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                }
+              },
+              onPageChanged: (focusedDay) {
+                if (mounted) {
+                  setState(() {
+                    _focusedDay = focusedDay;
+                  });
+                }
+              },
+              calendarFormat: CalendarFormat.month,
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              eventLoader: (day) {
+                return _appointments.where((apt) {
+                  return apt.dateTime.year == day.year &&
+                      apt.dateTime.month == day.month &&
+                      apt.dateTime.day == day.day;
+                }).map((apt) => apt.id).toList();
+              },
+              calendarStyle: CalendarStyle(
+                outsideDaysVisible: false,
+                weekendTextStyle: TextStyle(
+                  color: isDark ? Colors.grey[400] : AppColors.textSecondary,
+                ),
+                defaultTextStyle: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+                selectedDecoration: BoxDecoration(
+                  color: AppColors.primaryNavyBlue,
+                  shape: BoxShape.circle,
+                ),
+                todayDecoration: BoxDecoration(
+                  color: AppColors.primaryNavyBlue.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: BoxDecoration(
+                  color: AppColors.secondaryCrimsonRed,
+                  shape: BoxShape.circle,
+                ),
+                markersMaxCount: 3,
+                disabledTextStyle: TextStyle(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                ),
+              ),
+              headerStyle: HeaderStyle(
+                formatButtonVisible: true,
+                titleCentered: true,
+                titleTextStyle: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+                leftChevronIcon: Icon(
+                  Icons.chevron_left,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+                rightChevronIcon: Icon(
+                  Icons.chevron_right,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+              daysOfWeekStyle: DaysOfWeekStyle(
+                weekdayStyle: TextStyle(
+                  color: isDark ? Colors.grey[400] : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+                weekendStyle: TextStyle(
+                  color: isDark ? Colors.grey[400] : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+        
+        // Appointments for selected day
+        Expanded(
+          child: selectedDayAppointments.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 64,
+                        color: isDark ? Colors.white24 : Colors.grey[300],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No appointments on ${_formatDate(_selectedDay)}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? Colors.white54 : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: selectedDayAppointments.length,
+                  itemBuilder: (context, index) {
+                    final appointment = selectedDayAppointments[index];
+                    return AppointmentCard(
+                      appointment: appointment,
+                      isDoctorView: true,
+                      onTap: () {
+                        _showAppointmentDetails(appointment, true);
+                      },
+                      onAccept: appointment.status == 'pending'
+                          ? () => _acceptAppointment(appointment)
+                          : null,
+                      onReject: appointment.status == 'pending'
+                          ? () => _rejectAppointment(appointment)
+                          : null,
+                      onJoin: appointment.canJoin
+                          ? () => _joinConsultation(appointment)
+                          : null,
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

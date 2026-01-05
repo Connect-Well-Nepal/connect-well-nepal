@@ -562,7 +562,7 @@ class DoctorProfileScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: doctor.isAvailable
+            onPressed: (doctor.isAvailable || doctor.isAvailableNow)
                 ? () {
                     Navigator.push(
                       context,
@@ -575,7 +575,9 @@ class DoctorProfileScreen extends StatelessWidget {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryNavyBlue,
+              backgroundColor: doctor.isAvailableNow 
+                  ? AppColors.successGreen 
+                  : AppColors.primaryNavyBlue,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -583,14 +585,25 @@ class DoctorProfileScreen extends StatelessWidget {
               ),
               disabledBackgroundColor: Colors.grey,
             ),
-            child: Text(
-              doctor.isAvailable
-                  ? 'Book Appointment'
-                  : 'Currently Unavailable',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (doctor.isAvailableNow) ...[
+                  const Icon(Icons.flash_on, size: 20),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  doctor.isAvailableNow
+                      ? 'Book Now - Available'
+                      : doctor.isAvailable
+                          ? 'Book Appointment'
+                          : 'Currently Unavailable',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

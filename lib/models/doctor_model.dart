@@ -16,6 +16,7 @@ class Doctor {
   final int totalReviews;
   final double consultationFee;
   final bool isAvailable;
+  final bool isAvailableNow; // Current availability status for immediate booking
 
   Doctor({
     required this.id,
@@ -35,6 +36,7 @@ class Doctor {
     this.totalReviews = 0,
     this.consultationFee = 500.0,
     this.isAvailable = true,
+    this.isAvailableNow = false,
   });
 
   // Aliases for compatibility

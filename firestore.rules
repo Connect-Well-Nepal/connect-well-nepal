@@ -12,14 +12,32 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
     // ============== USERS COLLECTION ==============
     match /users/{userId} {
       // Users can read their own profile
-      allow read: if isOwner(userId);
+      // Also allow reading verified doctor/careProvider profiles (for patient browsing)
+      allow get: if isOwner(userId) || 
+        (resource.data.role == 'doctor' && resource.data.isVerifiedDoctor == true) ||
+        (resource.data.role == 'careProvider' && resource.data.isVerifiedDoctor == true);
+      
+      // Allow list queries for verified doctors (for browsing/searching)
+      // This allows queries like: where role == 'doctor' && isVerifiedDoctor == true
+      // Also allow admins to list pending verifications
+      allow list: if resource.data.role == 'doctor' && resource.data.isVerifiedDoctor == true ||
+        resource.data.role == 'careProvider' && resource.data.isVerifiedDoctor == true ||
+        isAdmin();
       
       // Users can create/update their own profile
+      // Admins can update doctor verification status
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId);
+      allow update: if isOwner(userId) || 
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isVerifiedDoctor', 'verifiedAt']));
       
       // Users can delete their own profile
       allow delete: if isOwner(userId);

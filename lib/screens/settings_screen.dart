@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/auth_screen.dart';
+import 'package:connect_well_nepal/screens/admin_verification_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 
 /// SettingsScreen - App settings and preferences
@@ -13,8 +14,22 @@ import 'package:connect_well_nepal/utils/colors.dart';
 /// - Account settings
 /// - Logout option
 /// - About section
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Refresh user data when settings screen opens to get latest admin status
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppProvider>().refreshUser();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +160,32 @@ class SettingsScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 24),
+
+              // Admin Section (only for admins)
+              if (appProvider.currentUser?.isAdmin == true) ...[
+                _buildSectionHeader(context, 'Admin'),
+                _buildSettingsCard(
+                  context,
+                  children: [
+                    _buildListTile(
+                      context,
+                      icon: Icons.verified_user,
+                      iconColor: AppColors.successGreen,
+                      title: 'Verify Doctors',
+                      subtitle: 'Review and verify doctor registrations',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AdminVerificationScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
 
               // About Section
               _buildSectionHeader(context, 'About'),

@@ -295,7 +295,7 @@ class AppointmentCard extends StatelessWidget {
       case 'confirmed':
         backgroundColor = AppColors.successGreen.withValues(alpha: 0.1);
         textColor = AppColors.successGreen;
-        statusText = 'Confirmed';
+        statusText = 'Booked';
         break;
       case 'pending':
         backgroundColor = Colors.orange.withValues(alpha: 0.1);
