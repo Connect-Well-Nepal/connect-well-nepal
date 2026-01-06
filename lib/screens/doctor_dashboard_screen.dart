@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/settings_screen.dart';
+import 'package:connect_well_nepal/screens/video_call_screen.dart';
+import 'package:connect_well_nepal/services/video_call_service.dart';
 import 'package:connect_well_nepal/screens/appointment_screen.dart';
 import 'package:connect_well_nepal/screens/schedule_management_screen.dart';
 import 'package:connect_well_nepal/services/database_service.dart';
@@ -521,9 +523,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                   label: 'Start Video\nConsultation',
                   color: Colors.green,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Video consultation coming soon!')),
-                    );
+                    _startVideoConsultation(context);
                   },
                 ),
               ),
@@ -753,8 +753,15 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     );
   }
 
-  /// Build appointment card from Appointment model
-  Widget _buildAppointmentCardFromModel(Appointment appointment, bool isDark) {
+  Widget _buildAppointmentCard({
+    required String patientName,
+    required String time,
+    required String type,
+    required String status,
+  }) {
+    final isVideoCall = type.contains('Video');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1071,6 +1078,41 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     );
   }
 
+  void _startVideoConsultation(BuildContext context) {
+    // For demo purposes - replace with actual patient/appointment data
+    const String channelId = 'demo_channel_doctor_call';
+    const String token = ''; // Empty token for testing (token-less mode)
+    final appProvider = context.read<AppProvider>();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => VideoCallScreen(
+          channelId: channelId,
+          token: token,
+          doctorName: 'Dr. ${appProvider.currentUser?.firstName ?? 'Doctor'}',
+          doctorSpecialty: appProvider.currentUser?.specialty,
+        ),
+      ),
+    );
+  }
+
+  void _startAppointmentVideoCall(BuildContext context, String patientName) {
+    // For demo purposes - replace with actual appointment data
+    final String channelId = 'demo_channel_appointment_${DateTime.now().millisecondsSinceEpoch}';
+    const String token = ''; // Empty token for testing (token-less mode)
+    final appProvider = context.read<AppProvider>();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => VideoCallScreen(
+          channelId: channelId,
+          token: token,
+          doctorName: 'Dr. ${appProvider.currentUser?.firstName ?? 'Doctor'}',
+          doctorSpecialty: appProvider.currentUser?.specialty,
+        ),
+      ),
+    );
+  }
 
   Widget _buildQuickActionCard({
     required IconData icon,
@@ -1090,7 +1132,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.05),
+              color: isDark ? Colors.black26 : const Color(0x0D000000),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),

@@ -1,0 +1,363 @@
+import 'dart:async';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import 'package:connect_well_nepal/services/video_call_service_base.dart'; // Import the base class
+
+/// VideoCallServiceMobile - Manages video calling functionality using Agora RTC Engine for mobile platforms
+///
+/// Features:
+/// - Initialize Agora RTC Engine
+/// - Join/leave video call channels
+/// - Audio/video controls (mute, camera toggle, speaker toggle)
+/// - Camera switching (front/back)
+/// - Call state management
+/// - Event callbacks for UI updates
+class VideoCallServiceMobile extends VideoCallServiceBase {
+  // Agora RTC Engine instance
+  RtcEngine? _engine;
+
+  // Call state
+  @override
+  bool _isInitialized = false;
+  @override
+  bool _isJoined = false;
+  @override
+  bool _isMuted = false;
+  @override
+  bool _isVideoEnabled = true;
+  @override
+  bool _isSpeakerEnabled = true;
+  @override
+  bool _isFrontCamera = true;
+
+  // Call info
+  @override
+  String? _channelId;
+  @override
+  int? _localUid;
+  DateTime? _callStartTime;
+  Timer? _callTimer;
+
+  // Call duration tracking
+  @override
+  int _callDurationSeconds = 0;
+
+  // Event streams for UI updates
+  final StreamController<CallEvent> _callEventController = StreamController<CallEvent>.broadcast();
+  final StreamController<RemoteUserEvent> _remoteUserController = StreamController<RemoteUserEvent>.broadcast();
+
+  // Remote users in call
+  @override
+  final Set<int> _remoteUsers = {};
+
+  // Agora App ID - In production, this should be stored securely
+  // TODO: Move to environment variables or secure storage
+  static const String _appId = "023887d77f714564850ef34e9c993659"; // Replace with actual App ID
+
+  // Getters
+  @override
+  bool get isInitialized => _isInitialized;
+  @override
+  dynamic getEngine() => _engine; // Return the native engine
+  @override
+  bool get isJoined => _isJoined;
+  @override
+  bool get isMuted => _isMuted;
+  @override
+  bool get isVideoEnabled => _isVideoEnabled;
+  @override
+  bool get isSpeakerEnabled => _isSpeakerEnabled;
+  @override
+  bool get isFrontCamera => _isFrontCamera;
+  @override
+  String? get channelId => _channelId;
+  @override
+  int? get localUid => _localUid;
+  @override
+  Set<int> get remoteUsers => _remoteUsers;
+  @override
+  int get callDurationSeconds => _callDurationSeconds;
+
+  // Computed properties
+  @override
+  bool get hasRemoteUsers => _remoteUsers.isNotEmpty;
+  @override
+  String get callDurationFormatted {
+    final minutes = (_callDurationSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_callDurationSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  // Event streams
+  @override
+  Stream<CallEvent> get callEvents => _callEventController.stream;
+  @override
+  Stream<RemoteUserEvent> get remoteUserEvents => _remoteUserController.stream;
+
+  /// Initialize Agora RTC Engine
+  @override
+  Future<bool> initialize() async {
+    try {
+      if (_isInitialized) return true;
+
+      // Check if App ID is configured
+      if (_appId.isEmpty || _appId.length < 10) {
+        _callEventController.add(CallEvent.error(
+          'Agora App ID not configured properly. Please check your App ID in video_call_service_mobile.dart'
+        ));
+        return false;
+      }
+
+      // Request camera and microphone permissions
+      final cameraStatus = await Permission.camera.request();
+      final microphoneStatus = await Permission.microphone.request();
+
+      if (cameraStatus.isDenied || microphoneStatus.isDenied) {
+        _callEventController.add(CallEvent.error('Camera and microphone permissions are required'));
+        return false;
+      }
+
+      // Create RTC engine instance
+      _engine = createAgoraRtcEngine();
+
+      // Initialize with app ID
+      await _engine!.initialize(const RtcEngineContext(
+        appId: _appId,
+        channelProfile: ChannelProfileType.channelProfileCommunication,
+      ));
+
+      // Enable video
+      await _engine!.enableVideo();
+
+      // Set up event handlers
+      _setupEventHandlers();
+
+      _isInitialized = true;
+      _callEventController.add(CallEvent.initialized());
+      notifyListeners();
+
+      return true;
+    } catch (e) {
+      debugPrint('❌ Failed to initialize Agora engine: $e');
+      debugPrint('📱 App ID being used: $_appId');
+      _callEventController.add(CallEvent.error('Failed to initialize video call: $e'));
+      return false;
+    }
+  }
+
+  /// Join a video call channel
+  @override
+  Future<bool> joinChannel({
+    required String channelId,
+    required String token,
+    int uid = 0,
+  }) async {
+    try {
+      if (!_isInitialized || _engine == null) {
+        _callEventController.add(CallEvent.error('Engine not initialized'));
+        return false;
+      }
+
+      if (_isJoined) {
+        await leaveChannel();
+      }
+
+      // Set channel profile for video call
+      await _engine!.setChannelProfile(ChannelProfileType.channelProfileCommunication);
+
+      // Join channel
+      final options = ChannelMediaOptions(
+        clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        channelProfile: ChannelProfileType.channelProfileCommunication,
+      );
+
+      debugPrint('🔄 Attempting to join channel: $channelId with token: ${token.isNotEmpty ? "provided" : "empty (token-less mode)"}');
+
+      await _engine!.joinChannel(
+        token: token,
+        channelId: channelId,
+        uid: uid,
+        options: options,
+      );
+
+      debugPrint('✅ Successfully joined channel: $channelId');
+      _channelId = channelId;
+      _localUid = uid;
+      _callStartTime = DateTime.now();
+      _callDurationSeconds = 0;
+
+      // Start call timer
+      _startCallTimer();
+
+      _callEventController.add(CallEvent.joined(channelId));
+      notifyListeners();
+
+      return true;
+    } catch (e) {
+      debugPrint('❌ Failed to join channel: $e');
+      debugPrint('🔍 Channel ID: $channelId, Token provided: ${token.isNotEmpty}');
+      _callEventController.add(CallEvent.error('Failed to join call: $e'));
+      return false;
+    }
+  }
+
+  /// Leave the current channel
+  @override
+  Future<void> leaveChannel() async {
+    try {
+      if (_engine != null && _isJoined) {
+        await _engine!.leaveChannel();
+      }
+
+      _isJoined = false;
+      _channelId = null;
+      _localUid = null;
+      _remoteUsers.clear();
+      _stopCallTimer();
+      _callStartTime = null;
+      _callDurationSeconds = 0;
+
+      _callEventController.add(CallEvent.left());
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error leaving channel: $e');
+    }
+  }
+
+  /// Toggle microphone mute/unmute
+  @override
+  Future<void> toggleMute() async {
+    try {
+      if (_engine != null) {
+        _isMuted = !_isMuted;
+        await _engine!.muteLocalAudioStream(_isMuted);
+        _callEventController.add(CallEvent.audioStateChanged(_isMuted));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error toggling mute: $e');
+    }
+  }
+
+  /// Toggle video on/off
+  @override
+  Future<void> toggleVideo() async {
+    try {
+      if (_engine != null) {
+        _isVideoEnabled = !_isVideoEnabled;
+        await _engine!.muteLocalVideoStream(_isVideoEnabled ? false : true);
+        _callEventController.add(CallEvent.videoStateChanged(_isVideoEnabled));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error toggling video: $e');
+    }
+  }
+
+  /// Toggle speaker on/off
+  @override
+  Future<void> toggleSpeaker() async {
+    try {
+      if (_engine != null) {
+        _isSpeakerEnabled = !_isSpeakerEnabled;
+        await _engine!.setEnableSpeakerphone(_isSpeakerEnabled);
+        _callEventController.add(CallEvent.speakerStateChanged(_isSpeakerEnabled));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error toggling speaker: $e');
+    }
+  }
+
+  /// Switch camera (front/back)
+  @override
+  Future<void> switchCamera() async {
+    try {
+      if (_engine != null) {
+        await _engine!.switchCamera();
+        _isFrontCamera = !_isFrontCamera;
+        _callEventController.add(CallEvent.cameraSwitched(_isFrontCamera));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error switching camera: $e');
+    }
+  }
+
+  /// Set up Agora event handlers
+  void _setupEventHandlers() {
+    if (_engine == null) return;
+
+    _engine!.registerEventHandler(RtcEngineEventHandler(
+      onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+        debugPrint('Successfully joined channel: ${connection.channelId}');
+        _isJoined = true;
+        notifyListeners();
+      },
+
+      onLeaveChannel: (RtcConnection connection, RtcStats stats) {
+        debugPrint('Left channel: ${connection.channelId}');
+        _isJoined = false;
+        _remoteUsers.clear();
+        notifyListeners();
+      },
+
+      onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+        debugPrint('Remote user joined: $remoteUid');
+        _remoteUsers.add(remoteUid);
+        _remoteUserController.add(RemoteUserEvent.joined(remoteUid));
+        notifyListeners();
+      },
+
+      onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+        debugPrint('Remote user offline: $remoteUid, reason: $reason');
+        _remoteUsers.remove(remoteUid);
+        _remoteUserController.add(RemoteUserEvent.left(remoteUid));
+        notifyListeners();
+      },
+
+      onError: (ErrorCodeType err, String msg) {
+        debugPrint('Agora error: $err - $msg');
+        _callEventController.add(CallEvent.error('Call error: $msg'));
+      },
+
+      onConnectionStateChanged: (RtcConnection connection, ConnectionStateType state, ConnectionChangedReasonType reason) {
+        debugPrint('Connection state changed: $state, reason: $reason');
+        _callEventController.add(CallEvent.connectionStateChanged(state, reason));
+      },
+    ));
+  }
+
+  /// Start call duration timer
+  void _startCallTimer() {
+    _callTimer?.cancel();
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _callDurationSeconds++;
+      notifyListeners();
+    });
+  }
+
+  /// Stop call duration timer
+  void _stopCallTimer() {
+    _callTimer?.cancel();
+    _callTimer = null;
+  }
+
+  /// Dispose of resources
+  @override
+  void dispose() {
+    _stopCallTimer();
+    _callEventController.close();
+    _remoteUserController.close();
+
+    if (_engine != null) {
+      _engine!.leaveChannel();
+      _engine!.release();
+      _engine = null;
+    }
+
+    super.dispose();
+  }
+}
