@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/settings_screen.dart';
 import 'package:connect_well_nepal/screens/video_call_screen.dart';
-import 'package:connect_well_nepal/services/video_call_service.dart';
 import 'package:connect_well_nepal/screens/appointment_screen.dart';
 import 'package:connect_well_nepal/screens/schedule_management_screen.dart';
 import 'package:connect_well_nepal/services/database_service.dart';
@@ -450,7 +449,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           else
             ..._todayAppointments.take(3).map((appointment) {
               return _buildAppointmentCardFromModel(appointment, isDark);
-            }),
+            }).toList(),
 
           const SizedBox(height: 24),
 
@@ -753,15 +752,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     );
   }
 
-  Widget _buildAppointmentCard({
-    required String patientName,
-    required String time,
-    required String type,
-    required String status,
-  }) {
-    final isVideoCall = type.contains('Video');
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  /// Build appointment card from Appointment model
+  Widget _buildAppointmentCardFromModel(Appointment appointment, bool isDark) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -850,12 +842,15 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ElevatedButton(
                 onPressed: appointment.canJoin 
                     ? () {
-                        // TODO: Navigate to consultation screen
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Starting ${appointment.type} consultation...'),
-                          ),
-                        );
+                        if (appointment.type == 'video') {
+                          _startAppointmentVideoCall(context, appointment.patientName);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Starting ${appointment.type} consultation...'),
+                            ),
+                          );
+                        }
                       }
                     : null,
                 style: ElevatedButton.styleFrom(

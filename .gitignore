@@ -10,18 +10,17 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ / Android Studio / IDEA
 *.iml
 *.ipr
 *.iws
 .idea/
+out/
 
-# VS Code
+# VS Code / Cursor IDE
 .vscode/
-*.code-workspace
-
-# Cursor IDE
 .cursor/
+*.code-workspace
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -39,6 +38,13 @@ migrate_working_dir/
 *.freezed.dart
 *.dart_tool/
 .flutter-plugins-dependencies.json
+
+# Flutter build artifacts
+**/build/
+**/outputs/
+**/intermediates/
+**/generated/
+**/GeneratedPluginRegistrant.*
 
 # Symbolication related
 app.*.symbols
@@ -59,8 +65,6 @@ app.*.map.json
 android/.gradle/
 android/local.properties
 # Note: gradlew and gradlew.bat SHOULD be tracked (they're version-controlled)
-# android/gradlew
-# android/gradlew.bat
 android/gradle/wrapper/gradle-wrapper.jar
 android/key.properties
 android/app/google-services.json
@@ -74,6 +78,16 @@ android/app/profile/
 android/.cxx/
 android/.externalNativeBuild/
 android/app/.cxx/
+android/app/outputs/
+android/app/intermediates/
+android/app/generated/
+android/.DS_Store
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
 
 # iOS related
 **/ios/**/*.mode1v3
@@ -107,6 +121,13 @@ android/app/.cxx/
 # macOS
 **/macos/Flutter/GeneratedPluginRegistrant.swift
 **/macos/Flutter/ephemeral/
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
 
 # Web
 /web/*.js
@@ -116,6 +137,9 @@ android/app/.cxx/
 windows/flutter/generated_plugin_registrant.cc
 windows/flutter/generated_plugin_registrant.h
 windows/flutter/generated_plugins.cmake
+ehthumbs.db
+Thumbs.db
+Desktop.ini
 
 # Linux  
 linux/flutter/generated_plugin_registrant.cc
@@ -169,6 +193,15 @@ lcov.info
 *.exe
 *.out
 
+# Split APK outputs (architecture-specific)
+app-*-debug.apk
+app-*-release.apk
+app-*-profile.apk
+*-armeabi-v7a-*.apk
+*-arm64-v8a-*.apk
+*-x86_64-*.apk
+*-x86-*.apk
+
 # Temporary files
 *.tmp
 *.temp
@@ -177,18 +210,10 @@ lcov.info
 *.swo
 *~
 ~*
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Desktop.ini
 
-# Logs
+# Logs and reports
 logs/
-*.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -206,10 +231,6 @@ test_driver/
 *.dart.js
 *.dart.js.map
 *.info.json
-
-# Generated files
-**/generated/
-**/GeneratedPluginRegistrant.*
 
 # Local configuration files
 local.properties

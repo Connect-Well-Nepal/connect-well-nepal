@@ -6,7 +6,10 @@ import 'package:connect_well_nepal/providers/app_provider.dart';
 import 'package:connect_well_nepal/screens/splash_screen.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 import 'package:flutter/foundation.dart';
-import 'package:connect_well_nepal/services/video_call_service.dart';
+import 'package:connect_well_nepal/services/video_call_service_mobile.dart';
+import 'package:connect_well_nepal/services/video_call_service_base.dart';
+import 'package:connect_well_nepal/services/local_notification_service.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 
 /// Entry point of the Connect Well Nepal application
 ///
@@ -18,6 +21,9 @@ import 'package:connect_well_nepal/services/video_call_service.dart';
 /// - Global app configuration
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize timezone data for notifications
+  tz.initializeTimeZones();
   
   // Initialize Firebase
   try {
@@ -34,12 +40,27 @@ void main() async {
     }
     // Continue without Firebase - app can work in guest mode
   }
+  
+  // Initialize local notifications
+  try {
+    await LocalNotificationService().initialize();
+    if (kDebugMode) {
+      debugPrint('✅ Local notifications initialized successfully');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('⚠️ Local notifications initialization failed: $e');
+    }
+  }
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppProvider()),
-        ChangeNotifierProvider(create: (_) => VideoCallService()),
+        // Use platform-specific video call service
+        ChangeNotifierProvider<VideoCallServiceBase>(
+          create: (_) => VideoCallServiceMobile(),
+        ),
       ],
       child: const ConnectWellNepalApp(),
     ),

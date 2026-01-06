@@ -19,29 +19,19 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
   RtcEngine? _engine;
 
   // Call state
-  @override
   bool _isInitialized = false;
-  @override
   bool _isJoined = false;
-  @override
   bool _isMuted = false;
-  @override
   bool _isVideoEnabled = true;
-  @override
   bool _isSpeakerEnabled = true;
-  @override
   bool _isFrontCamera = true;
 
   // Call info
-  @override
   String? _channelId;
-  @override
   int? _localUid;
-  DateTime? _callStartTime;
   Timer? _callTimer;
 
   // Call duration tracking
-  @override
   int _callDurationSeconds = 0;
 
   // Event streams for UI updates
@@ -49,7 +39,6 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
   final StreamController<RemoteUserEvent> _remoteUserController = StreamController<RemoteUserEvent>.broadcast();
 
   // Remote users in call
-  @override
   final Set<int> _remoteUsers = {};
 
   // Agora App ID - In production, this should be stored securely
@@ -185,7 +174,6 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
       debugPrint('✅ Successfully joined channel: $channelId');
       _channelId = channelId;
       _localUid = uid;
-      _callStartTime = DateTime.now();
       _callDurationSeconds = 0;
 
       // Start call timer
@@ -216,7 +204,6 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
       _localUid = null;
       _remoteUsers.clear();
       _stopCallTimer();
-      _callStartTime = null;
       _callDurationSeconds = 0;
 
       _callEventController.add(CallEvent.left());

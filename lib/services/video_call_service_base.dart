@@ -78,5 +78,6 @@ abstract class VideoCallServiceBase extends ChangeNotifier {
 
   // Optional: Getters for platform-specific engines if needed by UI (e.g., AgoraVideoView)
   dynamic getEngine();
+  dynamic get engine => getEngine();
 }
 

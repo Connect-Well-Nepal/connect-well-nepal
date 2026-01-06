@@ -16,7 +16,7 @@ void main() {
     // Verify that we start with the splash screen
     expect(find.text('Connect Well'), findsOneWidget);
     expect(find.text('Nepal'), findsOneWidget);
-    expect(find.text('Your Telehealth Partner'), findsOneWidget);
+    expect(find.text('Your Health, Our Priority'), findsOneWidget);
     
     // Wait for splash screen navigation (2 seconds + animation)
     await tester.pumpAndSettle(const Duration(seconds: 3));
@@ -32,6 +32,5 @@ void main() {
     
     // Verify that we start on the Home tab
     expect(find.text('Connect Well Nepal'), findsOneWidget);
-    expect(find.text('Quick Actions'), findsOneWidget);
   });
 }

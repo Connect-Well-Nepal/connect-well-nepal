@@ -143,6 +143,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'chat_list_fab',
         onPressed: () => _showNewChatDialog(currentUser),
         backgroundColor: AppColors.primaryNavyBlue,
         child: const Icon(Icons.chat, color: Colors.white),

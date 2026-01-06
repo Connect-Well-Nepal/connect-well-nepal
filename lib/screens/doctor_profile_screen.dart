@@ -1,9 +1,14 @@
 // lib/screens/doctor_profile_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/doctor_model.dart';
 import '../utils/colors.dart';
+import '../providers/app_provider.dart';
+import '../services/chat_service.dart';
 import 'booking_screen.dart';
+import 'chat_screen.dart';
+import 'video_call_screen.dart';
 
 /// Detailed doctor profile screen showing all information
 /// Including reviews, experience, availability, and booking option
@@ -177,6 +182,11 @@ class DoctorProfileScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 16),
+
+                // Communication buttons (Chat, Video Call, Voice Call)
+                _buildCommunicationButtons(context, isDark),
 
                 const SizedBox(height: 24),
 
@@ -706,5 +716,178 @@ class DoctorProfileScreen extends StatelessWidget {
       'Saturday',
       'Sunday'
     ];
+  }
+
+  /// Build communication buttons (Chat, Video Call, Voice Call)
+  Widget _buildCommunicationButtons(BuildContext context, bool isDark) {
+    final currentUser = context.read<AppProvider>().currentUser;
+    final isAvailable = doctor.isAvailable || doctor.isAvailableNow;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          // Chat button
+          Expanded(
+            child: _buildCommunicationButton(
+              context: context,
+              icon: Icons.chat_bubble_outline,
+              label: 'Chat',
+              color: AppColors.primaryNavyBlue,
+              isDark: isDark,
+              onTap: () => _startChat(context, currentUser),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Video Call button
+          Expanded(
+            child: _buildCommunicationButton(
+              context: context,
+              icon: Icons.videocam_outlined,
+              label: 'Video',
+              color: AppColors.successGreen,
+              isDark: isDark,
+              isEnabled: isAvailable,
+              onTap: () => _startVideoCall(context),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Voice Call button
+          Expanded(
+            child: _buildCommunicationButton(
+              context: context,
+              icon: Icons.phone_outlined,
+              label: 'Call',
+              color: Colors.orange,
+              isDark: isDark,
+              isEnabled: isAvailable,
+              onTap: () => _startVoiceCall(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunicationButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isDark,
+    bool isEnabled = true,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isEnabled
+          ? color.withValues(alpha: isDark ? 0.2 : 0.1)
+          : Colors.grey.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: isEnabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isEnabled
+                  ? color.withValues(alpha: 0.3)
+                  : Colors.grey.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isEnabled ? color : Colors.grey,
+                size: 28,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isEnabled
+                      ? (isDark ? Colors.white : AppColors.textPrimary)
+                      : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Start chat with doctor
+  Future<void> _startChat(BuildContext context, dynamic currentUser) async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to chat with the doctor')),
+      );
+      return;
+    }
+
+    try {
+      final chatService = ChatService();
+      
+      // Create or get existing conversation
+      final conversation = await chatService.getOrCreateConversation(
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+        doctorImage: doctor.photoUrl,
+        patientId: currentUser.id,
+        patientName: currentUser.name,
+        patientImage: currentUser.profileImageUrl,
+      );
+
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(conversation: conversation),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start chat: $e')),
+        );
+      }
+    }
+  }
+
+  /// Start video call with doctor
+  void _startVideoCall(BuildContext context) {
+    // Generate a unique channel ID for this call
+    final channelId = 'consultation_${doctor.id}_${DateTime.now().millisecondsSinceEpoch}';
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoCallScreen(
+          channelId: channelId,
+          token: '', // Empty token for testing (token-less mode)
+          doctorName: doctor.name,
+          doctorSpecialty: doctor.specialty,
+        ),
+      ),
+    );
+  }
+
+  /// Start voice call with doctor
+  void _startVoiceCall(BuildContext context) {
+    // For now, use the same video call screen but could be voice-only in future
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Voice call feature coming soon! Use video call for now.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 }

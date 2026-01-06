@@ -1598,6 +1598,7 @@ class _MainScreenState extends State<MainScreen> {
 
       // AI Assistant Floating Action Button
       floatingActionButton: FloatingActionButton(
+        heroTag: 'main_ai_fab',
         onPressed: () {
           Navigator.push(
             context,

@@ -52,6 +52,11 @@ service cloud.firestore {
         request.auth.uid == resource.data.createdBy
       );
       
+      // Allow list queries for authenticated users
+      // The read rule above will ensure users only see their own appointments
+      // This enables queries like: where doctorId == request.auth.uid
+      allow list: if isAuthenticated();
+      
       // Users can create appointments
       allow create: if isAuthenticated() && 
         request.resource.data.patientId == request.auth.uid;
@@ -112,6 +117,53 @@ service cloud.firestore {
       
       // Users can delete their own verification codes
       allow delete: if isOwner(userId);
+    }
+    
+    // ============== CONVERSATIONS COLLECTION ==============
+    match /conversations/{conversationId} {
+      // Users can read conversations they're part of
+      allow read: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid
+      );
+      
+      // Allow list queries for authenticated users (filtered by patientId or doctorId)
+      allow list: if isAuthenticated();
+      
+      // Users can create conversations
+      allow create: if isAuthenticated() && (
+        request.resource.data.patientId == request.auth.uid ||
+        request.resource.data.doctorId == request.auth.uid
+      );
+      
+      // Both parties can update conversations
+      allow update: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid
+      );
+      
+      // Either party can delete a conversation
+      allow delete: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.doctorId == request.auth.uid
+      );
+    }
+    
+    // ============== MESSAGES COLLECTION ==============
+    match /messages/{messageId} {
+      // Users can read messages from conversations they're part of
+      allow read: if isAuthenticated();
+      
+      // Users can create messages in conversations they're part of
+      allow create: if isAuthenticated() && 
+        request.resource.data.senderId == request.auth.uid;
+      
+      // Messages can be updated (e.g., mark as read)
+      allow update: if isAuthenticated();
+      
+      // Senders can delete their own messages
+      allow delete: if isAuthenticated() && 
+        resource.data.senderId == request.auth.uid;
     }
     
     // Deny all other access

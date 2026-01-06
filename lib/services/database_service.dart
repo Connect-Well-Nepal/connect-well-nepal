@@ -297,67 +297,88 @@ class DatabaseService {
     try {
       // Don't query Firebase for guest users
       if (userId == 'guest' || userId.isEmpty) {
-        debugPrint('Skipping Firebase query for guest user');
+        debugPrint('📋 Skipping Firebase query for guest user');
         return [];
       }
 
       // Check if Firebase is available
       if (!isFirebaseAvailable) {
-        debugPrint('Firebase not available, returning empty list');
+        debugPrint('📋 Firebase not available, returning empty list');
         return [];
       }
 
       final field = isDoctor ? 'doctorId' : 'patientId';
       
-      debugPrint('🔍 Querying appointments for $field: $userId');
+      debugPrint('🔍 Querying appointments collection for $field: $userId');
       
-      Query query = _appointmentsCollection.where(field, isEqualTo: userId);
+      // Query without ordering first (simpler, no index required)
+      // This is more reliable as it doesn't require composite indexes
+      QuerySnapshot querySnapshot;
       
-      // Try to order by dateTime, but handle case where index might not exist
       try {
-        query = query.orderBy('dateTime', descending: false);
+        querySnapshot = await _appointmentsCollection
+            .where(field, isEqualTo: userId)
+            .get();
+        
+        debugPrint('✅ Query successful! Found ${querySnapshot.docs.length} appointments');
+        
+        // Log each document for debugging
+        for (var doc in querySnapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          debugPrint('   📄 Doc ${doc.id}: patientId=${data['patientId']}, doctorId=${data['doctorId']}, status=${data['status']}');
+        }
+        
       } catch (e) {
-        debugPrint('⚠️ Could not order by dateTime (index may be missing): $e');
-        // Continue without ordering - we'll sort in memory
+        debugPrint('❌ Query failed: $e');
+        debugPrint('   This might be a permission issue or network error');
+        return [];
       }
       
-      final querySnapshot = await query.get();
-      
-      debugPrint('✅ Found ${querySnapshot.docs.length} appointments');
-
       final results = querySnapshot.docs
           .map((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            // Ensure both dateTime and appointmentTime are set for compatibility
             final dateTime = data['dateTime'] ?? data['appointmentTime'];
             return {
               ...data,
-              'id': doc.id, // Ensure id is set
-              'dateTime': dateTime, // Normalize to dateTime
-              'appointmentTime': dateTime, // Also set appointmentTime for backward compatibility
+              'id': doc.id,
+              'dateTime': dateTime,
+              'appointmentTime': dateTime,
             };
           })
           .toList();
       
-      // Sort in memory if we couldn't order by dateTime
-      try {
-        results.sort((a, b) {
-          final aTime = a['dateTime'];
-          final bTime = b['dateTime'];
-          if (aTime is Timestamp && bTime is Timestamp) {
-            return aTime.compareTo(bTime);
-          } else if (aTime is String && bTime is String) {
-            return DateTime.parse(aTime).compareTo(DateTime.parse(bTime));
-          }
-          return 0;
-        });
-      } catch (e) {
-        debugPrint('⚠️ Error sorting appointments: $e');
-      }
+      // Sort in memory by dateTime
+      results.sort((a, b) {
+        final aTime = a['dateTime'];
+        final bTime = b['dateTime'];
+        
+        DateTime? aDateTime;
+        DateTime? bDateTime;
+        
+        if (aTime is Timestamp) {
+          aDateTime = aTime.toDate();
+        } else if (aTime is String) {
+          aDateTime = DateTime.tryParse(aTime);
+        }
+        
+        if (bTime is Timestamp) {
+          bDateTime = bTime.toDate();
+        } else if (bTime is String) {
+          bDateTime = DateTime.tryParse(bTime);
+        }
+        
+        if (aDateTime == null && bDateTime == null) return 0;
+        if (aDateTime == null) return 1;
+        if (bDateTime == null) return -1;
+        
+        return aDateTime.compareTo(bDateTime);
+      });
       
+      debugPrint('📋 Returning ${results.length} appointments after processing');
       return results;
-    } catch (e) {
-      debugPrint('Error getting appointments: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error getting appointments: $e');
+      debugPrint('   Stack trace: $stackTrace');
       // Return empty list instead of throwing
       return [];
     }
@@ -368,41 +389,75 @@ class DatabaseService {
     String userId, {
     bool isDoctor = false,
   }) {
-    try {
-      // Don't query Firebase for guest users
-      if (userId == 'guest' || userId.isEmpty) {
-        debugPrint('Skipping Firebase stream for guest user');
-        return Stream.value([]);
-      }
-
-      // Check if Firebase is available
-      if (!isFirebaseAvailable) {
-        debugPrint('Firebase not available, returning empty stream');
-        return Stream.value([]);
-      }
-
-      final field = isDoctor ? 'doctorId' : 'patientId';
-      return _appointmentsCollection
-          .where(field, isEqualTo: userId)
-          .orderBy('dateTime', descending: false)
-          .snapshots()
-          .map((snapshot) => snapshot.docs
-              .map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                // Ensure both dateTime and appointmentTime are set for compatibility
-                final dateTime = data['dateTime'] ?? data['appointmentTime'];
-                return {
-                  ...data,
-                  'id': doc.id,
-                  'dateTime': dateTime, // Normalize to dateTime
-                  'appointmentTime': dateTime, // Also set appointmentTime for backward compatibility
-                };
-              })
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting appointments stream: $e');
+    // Don't query Firebase for guest users
+    if (userId == 'guest' || userId.isEmpty) {
+      debugPrint('📋 Skipping Firebase stream for guest user');
       return Stream.value([]);
     }
+
+    // Check if Firebase is available
+    if (!isFirebaseAvailable) {
+      debugPrint('📋 Firebase not available, returning empty stream');
+      return Stream.value([]);
+    }
+
+    final field = isDoctor ? 'doctorId' : 'patientId';
+    debugPrint('🔍 Setting up appointments stream for $field: $userId');
+    
+    // Query without ordering to avoid index requirement
+    // Sort in memory instead
+    return _appointmentsCollection
+        .where(field, isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          debugPrint('📋 Stream received ${snapshot.docs.length} appointments');
+          
+          final results = snapshot.docs
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final dateTime = data['dateTime'] ?? data['appointmentTime'];
+              return {
+                ...data,
+                'id': doc.id,
+                'dateTime': dateTime,
+                'appointmentTime': dateTime,
+              };
+            })
+            .toList();
+          
+          // Sort in memory by dateTime
+          results.sort((a, b) {
+            final aTime = a['dateTime'];
+            final bTime = b['dateTime'];
+            
+            DateTime? aDateTime;
+            DateTime? bDateTime;
+            
+            if (aTime is Timestamp) {
+              aDateTime = aTime.toDate();
+            } else if (aTime is String) {
+              aDateTime = DateTime.tryParse(aTime);
+            }
+            
+            if (bTime is Timestamp) {
+              bDateTime = bTime.toDate();
+            } else if (bTime is String) {
+              bDateTime = DateTime.tryParse(bTime);
+            }
+            
+            if (aDateTime == null && bDateTime == null) return 0;
+            if (aDateTime == null) return 1;
+            if (bDateTime == null) return -1;
+            
+            return aDateTime.compareTo(bDateTime);
+          });
+          
+          return results;
+        })
+        .handleError((e) {
+          debugPrint('❌ Error in appointments stream: $e');
+          return <Map<String, dynamic>>[];
+        });
   }
 
   /// Update appointment status

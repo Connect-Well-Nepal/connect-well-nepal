@@ -14,6 +14,7 @@ import '../services/local_notification_service.dart';
 import 'booking_screen.dart';
 import 'doctor_profile_screen.dart';
 import 'schedule_management_screen.dart';
+import 'video_call_screen.dart';
 
 /// Main appointments screen showing upcoming and past appointments
 /// Includes tabs for filtering and quick booking action
@@ -69,6 +70,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
   /// Load appointments from Firebase
   Future<void> _loadAppointments() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
@@ -77,24 +80,42 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       final appProvider = context.read<AppProvider>();
       final currentUser = appProvider.currentUser;
       
+      debugPrint('📋 _loadAppointments called');
+      debugPrint('📋 Current user: ${currentUser?.id ?? "null"}, isGuest: ${currentUser?.isGuest ?? "null"}');
+      
       // Check if user is null or guest - use sample data
-      if (currentUser == null || currentUser.isGuest || currentUser.id == 'guest') {
+      if (currentUser == null || currentUser.isGuest) {
+        debugPrint('📋 User is null or guest, loading sample appointments');
         // Load sample appointments for guests or when not logged in
         _loadSampleAppointments();
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
         return;
       }
 
+      debugPrint('📋 Loading appointments for user: ${currentUser.id}, isDoctor: ${currentUser.isDoctor}');
+      
       // Load from Firebase only for authenticated users
       final appointmentsData = await _databaseService.getUserAppointments(
         currentUser.id,
         isDoctor: currentUser.isDoctor,
       );
 
-      debugPrint('📋 Loading appointments for user: ${currentUser.id}, isDoctor: ${currentUser.isDoctor}');
-      debugPrint('📋 Found ${appointmentsData.length} appointment records');
+      debugPrint('📋 Found ${appointmentsData.length} appointment records from Firebase');
+      
+      if (appointmentsData.isEmpty) {
+        debugPrint('📋 No appointments found in Firebase for user ${currentUser.id}');
+        _appointments = [];
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
       
       _appointments = appointmentsData
           .map((data) {
@@ -102,31 +123,30 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               // Ensure id is set
               final appointmentId = data['id'] ?? '';
               if (appointmentId.isEmpty) {
-                debugPrint('⚠️ Appointment missing id');
+                debugPrint('⚠️ Appointment missing id, skipping');
                 return null;
               }
               
               // Handle both 'dateTime' and 'appointmentTime' fields
-              final dateTimeStr = data['dateTime'] ?? data['appointmentTime'];
-              if (dateTimeStr == null) {
-                debugPrint('⚠️ Appointment ${appointmentId} missing dateTime');
+              final dateTimeValue = data['dateTime'] ?? data['appointmentTime'];
+              if (dateTimeValue == null) {
+                debugPrint('⚠️ Appointment $appointmentId missing dateTime, skipping');
                 return null;
               }
               
               // Handle Timestamp objects from Firestore
-              final dateTimeValue = data['dateTime'] ?? data['appointmentTime'];
-              String? dateTimeStrFinal;
+              String dateTimeStrFinal;
               if (dateTimeValue is Timestamp) {
                 dateTimeStrFinal = dateTimeValue.toDate().toIso8601String();
               } else if (dateTimeValue is String) {
                 dateTimeStrFinal = dateTimeValue;
               } else {
-                debugPrint('⚠️ Invalid dateTime format for ${appointmentId}: $dateTimeValue');
+                debugPrint('⚠️ Invalid dateTime format for $appointmentId: $dateTimeValue (${dateTimeValue.runtimeType})');
                 return null;
               }
               
               // Handle createdAt
-              String? createdAtStr;
+              String createdAtStr;
               final createdAtValue = data['createdAt'];
               if (createdAtValue is Timestamp) {
                 createdAtStr = createdAtValue.toDate().toIso8601String();
@@ -149,18 +169,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               
               final appointment = Appointment.fromMap({
                 ...data,
-                'id': appointmentId, // Ensure id is set
+                'id': appointmentId,
                 'dateTime': dateTimeStrFinal,
-                'appointmentTime': dateTimeStrFinal, // Ensure both are set
+                'appointmentTime': dateTimeStrFinal,
                 'createdAt': createdAtStr,
                 'updatedAt': updatedAtStr,
               });
               
-              debugPrint('✅ Parsed appointment: ${appointment.id}, status: ${appointment.status}, dateTime: ${appointment.dateTime}');
+              debugPrint('✅ Parsed appointment: ${appointment.id}, patient: ${appointment.patientId}, doctor: ${appointment.doctorId}, status: ${appointment.status}, dateTime: ${appointment.dateTime}');
               return appointment;
-            } catch (e) {
+            } catch (e, stackTrace) {
               debugPrint('❌ Error parsing appointment: $e');
               debugPrint('   Data: $data');
+              debugPrint('   Stack: $stackTrace');
               return null;
             }
           })
@@ -168,9 +189,15 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
           .toList();
       
       debugPrint('✅ Successfully loaded ${_appointments.length} appointments');
-    } catch (e) {
+      
+      // Log upcoming vs past breakdown
+      final upcoming = _appointments.where((apt) => apt.isUpcoming).length;
+      final past = _appointments.where((apt) => apt.isPast).length;
+      debugPrint('📋 Breakdown: $upcoming upcoming, $past past');
+      
+    } catch (e, stackTrace) {
       debugPrint('❌ Error loading appointments: $e');
-      debugPrint('   Stack trace: ${StackTrace.current}');
+      debugPrint('   Stack trace: $stackTrace');
       // Don't fallback to sample data - show empty state instead
       _appointments = [];
     } finally {
@@ -353,6 +380,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       // Floating action button - show different for doctors vs patients
       floatingActionButton: isDoctor
           ? FloatingActionButton.extended(
+              heroTag: 'appointment_doctor_fab',
               onPressed: () {
                 Navigator.push(
                   context,
@@ -366,6 +394,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
               label: const Text('Manage Schedule'),
             )
           : FloatingActionButton.extended(
+              heroTag: 'appointment_patient_fab',
               onPressed: () async {
                 final result = await Navigator.push(
                   context,
@@ -1156,15 +1185,97 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
 
   /// Join consultation
   void _joinConsultation(Appointment appointment) {
-    // TODO: Navigate to video/voice/chat screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Joining ${_getConsultationType(appointment.type)}...',
+    final appProvider = context.read<AppProvider>();
+    final currentUser = appProvider.currentUser;
+    
+    // Check if user is authenticated
+    if (currentUser == null || currentUser.isGuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to join consultations'),
+          backgroundColor: AppColors.secondaryCrimsonRed,
         ),
-        backgroundColor: AppColors.successGreen,
-      ),
-    );
+      );
+      return;
+    }
+    
+    // Generate channel ID based on appointment ID (ensures same channel for patient and doctor)
+    final String channelId = 'appointment_${appointment.id}';
+    const String token = ''; // Empty token for testing (token-less mode with Agora)
+    
+    // Determine participant names based on user role
+    String? participantName;
+    String? participantSpecialty;
+    
+    if (currentUser.isDoctor) {
+      // Doctor viewing - show patient name
+      participantName = appointment.patientName;
+      participantSpecialty = null;
+    } else {
+      // Patient viewing - show doctor name
+      participantName = appointment.doctorName;
+      participantSpecialty = appointment.doctorSpecialty;
+    }
+    
+    // Navigate based on consultation type
+    switch (appointment.type) {
+      case 'video':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => VideoCallScreen(
+              channelId: channelId,
+              token: token,
+              doctorName: currentUser.isDoctor ? null : participantName,
+              doctorSpecialty: currentUser.isDoctor ? null : participantSpecialty,
+            ),
+          ),
+        );
+        break;
+      case 'voice':
+        // For voice calls, use the same video call screen but could be voice-only in future
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => VideoCallScreen(
+              channelId: channelId,
+              token: token,
+              doctorName: currentUser.isDoctor ? null : participantName,
+              doctorSpecialty: currentUser.isDoctor ? null : participantSpecialty,
+            ),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Voice call feature - using video call interface'),
+            backgroundColor: AppColors.primaryNavyBlue,
+          ),
+        );
+        break;
+      case 'chat':
+        // Navigate to chat screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat consultation feature coming soon!'),
+            backgroundColor: AppColors.primaryNavyBlue,
+          ),
+        );
+        // TODO: Navigate to chat screen when implemented
+        // Navigator.of(context).push(
+        //   MaterialPageRoute(
+        //     builder: (context) => ChatScreen(
+        //       conversationId: channelId,
+        //       participantName: participantName,
+        //     ),
+        //   ),
+        // );
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unknown consultation type: ${appointment.type}'),
+            backgroundColor: AppColors.secondaryCrimsonRed,
+          ),
+        );
+    }
   }
 
   /// Rate appointment

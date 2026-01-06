@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:connect_well_nepal/utils/colors.dart';
 import 'package:connect_well_nepal/screens/video_call_screen.dart';
-import 'package:connect_well_nepal/services/video_call_service.dart';
-import 'package:provider/provider.dart';
 
 /// ConsultationScreen - Video consultation interface (Week 1-3)
 ///

@@ -27,7 +27,6 @@ class VideoCallService extends ChangeNotifier {
   // Call info
   String? _channelId;
   int? _localUid;
-  DateTime? _callStartTime;
   Timer? _callTimer;
 
   // Call duration tracking
@@ -156,7 +155,6 @@ class VideoCallService extends ChangeNotifier {
       debugPrint('✅ Successfully joined channel: $channelId');
       _channelId = channelId;
       _localUid = uid;
-      _callStartTime = DateTime.now();
       _callDurationSeconds = 0;
 
       // Start call timer
@@ -186,7 +184,6 @@ class VideoCallService extends ChangeNotifier {
       _localUid = null;
       _remoteUsers.clear();
       _stopCallTimer();
-      _callStartTime = null;
       _callDurationSeconds = 0;
 
       _callEventController.add(CallEvent.left());
