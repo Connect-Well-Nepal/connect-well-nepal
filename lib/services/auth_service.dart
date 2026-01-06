@@ -46,10 +46,8 @@ class AuthService {
   }) async {
     try {
       // Create user in Firebase Auth
-      final UserCredential credential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential credential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       if (credential.user == null) {
         return AuthResult.failure('Failed to create account');
@@ -112,7 +110,8 @@ class AuthService {
       // Fetch user data from Firestore (with timeout for faster response)
       UserModel? userModel;
       try {
-        userModel = await _dbService.getUser(credential.user!.uid)
+        userModel = await _dbService
+            .getUser(credential.user!.uid)
             .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('⚠️ Firestore fetch timeout or error: $e');
@@ -122,10 +121,11 @@ class AuthService {
       if (userModel != null) {
         // Update email verification status asynchronously (don't wait)
         if (credential.user!.emailVerified && !userModel.isEmailVerified) {
-          _dbService.updateUser(
-            credential.user!.uid,
-            {'isEmailVerified': true},
-          ).catchError((e) => debugPrint('Failed to update verification status: $e'));
+          _dbService
+              .updateUser(credential.user!.uid, {'isEmailVerified': true})
+              .catchError(
+                (e) => debugPrint('Failed to update verification status: $e'),
+              );
         }
         return AuthResult.success(userModel);
       } else {
@@ -137,8 +137,11 @@ class AuthService {
           isEmailVerified: credential.user!.emailVerified,
         );
         // Create user asynchronously (don't wait)
-        _dbService.createUser(newUser)
-            .catchError((e) => debugPrint('Failed to create user in Firestore: $e'));
+        _dbService
+            .createUser(newUser)
+            .catchError(
+              (e) => debugPrint('Failed to create user in Firestore: $e'),
+            );
         return AuthResult.success(newUser);
       }
     } on FirebaseAuthException catch (e) {
@@ -160,7 +163,8 @@ class AuthService {
       }
 
       // Get auth details
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // Create credential
       final OAuthCredential credential = GoogleAuthProvider.credential(
@@ -169,7 +173,9 @@ class AuthService {
       );
 
       // Sign in to Firebase
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
 
       if (userCredential.user == null) {
         return AuthResult.failure('Google sign in failed');
@@ -270,14 +276,17 @@ class AuthService {
 
       // Update password
       await user.updatePassword(newPassword);
-      
+
       debugPrint('✅ Password changed successfully');
-      return AuthResult.success(await _dbService.getUser(user.uid) ?? UserModel(
-        id: user.uid,
-        name: user.displayName ?? 'User',
-        email: user.email!,
-        isEmailVerified: user.emailVerified,
-      ));
+      return AuthResult.success(
+        await _dbService.getUser(user.uid) ??
+            UserModel(
+              id: user.uid,
+              name: user.displayName ?? 'User',
+              email: user.email!,
+              isEmailVerified: user.emailVerified,
+            ),
+      );
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getErrorMessage(e.code));
     } catch (e) {
