@@ -70,12 +70,34 @@
 ✅ **Location Services** - Real-time GPS location  
 ✅ **Places API** - OpenStreetMap integration for global healthcare facilities  
 
-### 🔄 In Progress:
-🔄 Video consultation integration (Agora/Jitsi)  
-🔄 Real-time appointment booking  
-🔄 Push notifications  
+#### **Appointment Management**
+✅ **Booking Screen** - Complete date/time selection with calendar  
+✅ **Appointment Management** - View, cancel, reschedule appointments  
+✅ **Doctor Profile** - Detailed doctor information with ratings  
+✅ **Schedule Management** - Doctor availability management  
+✅ **Local Notifications** - Appointment reminders  
+✅ **Time Slot Selection** - Interactive time picker widget
+
+#### **Consultation Features**
+✅ **Video Calls** - Agora RTC integration for video consultations  
+✅ **Chat Consultation** - Real-time text messaging with doctors  
+✅ **Chat List** - View all conversations  
+✅ **Call Controls** - Mute, video toggle, camera switch, speaker  
+✅ **Call Timer** - Track consultation duration
+
+#### **Additional Features**
+✅ **AI Assistant** - Chatbot for app navigation and help  
+✅ **Doctor Browsing** - Browse all available doctors  
+✅ **Healthcare Facilities** - Nearby clinics and hospitals  
+✅ **Admin Verification** - Doctor verification system  
+✅ **Article Bookmarking** - Save favorite health articles
+
+### 🔄 In Progress / Planned:
+🔄 Push notifications (FCM ready, needs server setup)  
 🔄 Prescription sharing  
 🔄 Multi-language support (Nepali/English)  
+🔄 Payment integration  
+🔄 Analytics dashboard  
 
 ---
 
@@ -90,7 +112,8 @@ lib/
 │   ├── clinic_model.dart       ✅ Clinic data
 │   ├── article_model.dart      ✅ Health articles
 │   ├── chat_model.dart         ✅ Messages & conversations
-│   └── [More models...]
+│   ├── appointment_model.dart  ✅ Appointments
+│   └── doctor_model.dart       ✅ Doctor information
 ├── providers/                   # State management
 │   └── app_provider.dart       ✅ Auth, theme, user state
 ├── screens/                     # Full-page screens
@@ -102,25 +125,36 @@ lib/
 │   ├── doctor_dashboard_screen.dart ✅ Doctor home
 │   ├── profile_screen.dart     ✅ Profile management
 │   ├── settings_screen.dart    ✅ App settings
-│   ├── appointments_screen.dart ✅ (Skeleton)
-│   ├── consultation_screen.dart ✅ (Skeleton)
+│   ├── appointment_screen.dart ✅ Complete appointment management
+│   ├── booking_screen.dart     ✅ Full booking flow with calendar
+│   ├── consultation_screen.dart ✅ Consultation type selection
+│   ├── video_call_screen.dart  ✅ Agora RTC video calls
 │   ├── resources_screen.dart   ✅ Health content
-│   ├── article_detail_screen.dart ✅ Article reader
+│   ├── article_detail_screen.dart ✅ Article reader with bookmarks
 │   ├── category_screen.dart    ✅ Category browsing
-│   ├── chat_screen.dart        ✅ Real-time chat
+│   ├── chat_screen.dart        ✅ Real-time chat messaging
 │   ├── chat_list_screen.dart   ✅ Conversation list
 │   ├── ai_assistant_screen.dart ✅ AI chatbot
 │   ├── all_doctors_screen.dart  ✅ Doctor browsing
-│   └── all_healthcare_screen.dart ✅ Healthcare facilities
+│   ├── all_healthcare_screen.dart ✅ Healthcare facilities
+│   ├── doctor_profile_screen.dart ✅ Doctor details & ratings
+│   ├── schedule_management_screen.dart ✅ Doctor schedule management
+│   └── admin_verification_screen.dart ✅ Admin doctor verification
 ├── widgets/                     # Reusable components
 │   ├── clinic_card.dart        ✅ Clinic display
-│   └── article_card.dart       ✅ Article display
+│   ├── article_card.dart       ✅ Article display
+│   ├── appointment_card.dart   ✅ Appointment display card
+│   └── time_selector.dart      ✅ Time slot selector widget
 ├── services/                    # Backend services
 │   ├── auth_service.dart       ✅ Firebase Auth
 │   ├── database_service.dart   ✅ Firestore operations
 │   ├── storage_service.dart    ✅ Firebase Storage
 │   ├── notification_service.dart ✅ FCM setup
+│   ├── local_notification_service.dart ✅ Local appointment reminders
 │   ├── chat_service.dart       ✅ Real-time messaging
+│   ├── video_call_service.dart ✅ Video call management
+│   ├── video_call_service_base.dart ✅ Video call base interface
+│   ├── video_call_service_mobile.dart ✅ Mobile video call implementation
 │   ├── location_service.dart   ✅ GPS location
 │   ├── places_service.dart     ✅ Google Places (ready)
 │   ├── osm_places_service.dart ✅ OpenStreetMap places
@@ -176,12 +210,12 @@ This project is developed by a team of 4 students:
 
 | Member | Focus Area | Status |
 |--------|-----------|--------|
-| **Member 1** | Appointments & Booking | 🔄 In Progress |
-| **Member 2** | Video/Voice Calls | 🔄 In Progress |
-| **Member 3** | Health Resources | ✅ Articles & Content Complete |
-| **Member 4** | Backend & Auth | ✅ **COMPLETE** - All services implemented |
+| **Member 1** | Appointments & Booking | ✅ **COMPLETE** - Full booking flow implemented |
+| **Member 2** | Video/Voice Calls & Chat | ✅ **COMPLETE** - Agora RTC & real-time chat ready |
+| **Member 3** | Health Resources | ✅ **COMPLETE** - Articles, categories, bookmarks implemented |
+| **Member 4** | Backend & Auth | ✅ **COMPLETE** - All Firebase services implemented |
 
-**See `TEAM_DISTRIBUTION.md` for detailed task assignments.**
+**See `TEAM_DISTRIBUTION.md` for detailed task assignments and implementation status.**
 
 ---
 
@@ -229,7 +263,9 @@ This project is developed by a team of 4 students:
 | **Google Sign-In** | Social authentication | ✅ Integrated |
 | **Geolocator** | Location services | ✅ Integrated |
 | **OpenStreetMap** | Places API (free alternative) | ✅ Integrated |
-| **Agora/Jitsi** | Video calling | 🔄 Planned |
+| **Agora RTC Engine** | Video calling | ✅ Integrated |
+| **Table Calendar** | Appointment booking calendar | ✅ Integrated |
+| **Local Notifications** | Appointment reminders | ✅ Integrated |
 
 ---
 
@@ -308,7 +344,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [x] Material Design 3 theming
 - [x] Dark mode support
 
-### Phase 2 - Core Features ✅ **MOSTLY COMPLETE**
+### Phase 2 - Core Features ✅ **COMPLETE**
 - [x] Firebase integration
 - [x] User authentication (Email, Google)
 - [x] Email verification
@@ -319,13 +355,19 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [x] Nearby healthcare facilities
 - [x] AI assistant
 - [x] Settings & preferences
-- [ ] Appointment booking (In Progress)
-- [ ] Video consultations (Planned)
+- [x] Appointment booking (Complete with calendar & notifications)
+- [x] Video consultations (Agora RTC integrated)
+- [x] Chat consultations
+- [x] Doctor profile & browsing
+- [x] Schedule management
+- [x] Article bookmarking
 
-### Phase 3 - Advanced Features 🔄 **IN PROGRESS**
-- [ ] Complete appointment booking flow
-- [ ] Video/voice call integration
-- [ ] Push notifications
+### Phase 3 - Advanced Features 🔄 **PARTIALLY COMPLETE**
+- [x] Complete appointment booking flow
+- [x] Video call integration (Agora RTC)
+- [x] Chat consultation
+- [x] Local notifications (appointment reminders)
+- [ ] Push notifications (FCM ready, needs server configuration)
 - [ ] Prescription management
 - [ ] Payment integration
 - [ ] Analytics dashboard
