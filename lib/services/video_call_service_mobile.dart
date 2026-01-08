@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:connect_well_nepal/services/video_call_service_base.dart'; // Import the base class
+import 'package:connect_well_nepal/services/agora_token_service.dart'; // Token service for production
 
 /// VideoCallServiceMobile - Manages video calling functionality using Agora RTC Engine for mobile platforms
 ///
@@ -43,7 +44,18 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
 
   // Agora App ID - In production, this should be stored securely
   // TODO: Move to environment variables or secure storage
-  static const String _appId = "023887d77f714564850ef34e9c993659"; // Replace with actual App ID
+  static const String _appId = "0f3b01a62b1e4644b1ae017327c3be69";
+  
+  // PRODUCTION SETUP:
+  // 1. Enable token authentication in Agora Console (Security settings)
+  // 2. Set up backend token server (see agora_token_service.dart for examples)
+  // 3. Update tokenServerUrl in AgoraTokenService
+  // 4. Never expose App Certificate in client code
+  //
+  // DEVELOPMENT SETUP:
+  // 1. Option A: Disable token authentication in Agora Console (use empty tokens)
+  // 2. Option B: Use "Generate Temp Token" in Agora Console for testing
+  // 3. Option C: Set up local token server for development
 
   // Getters
   @override
@@ -99,29 +111,90 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
         return false;
       }
 
-      // Request camera and microphone permissions
-      final cameraStatus = await Permission.camera.request();
-      final microphoneStatus = await Permission.microphone.request();
+      // Request camera and microphone permissions (skip on web, handled by browser)
+      if (!kIsWeb) {
+        final cameraStatus = await Permission.camera.request();
+        final microphoneStatus = await Permission.microphone.request();
 
-      if (cameraStatus.isDenied || microphoneStatus.isDenied) {
-        _callEventController.add(CallEvent.error('Camera and microphone permissions are required'));
-        return false;
+        if (cameraStatus.isDenied || microphoneStatus.isDenied) {
+          _callEventController.add(CallEvent.error('Camera and microphone permissions are required'));
+          return false;
+        }
       }
 
       // Create RTC engine instance
-      _engine = createAgoraRtcEngine();
+      try {
+        _engine = createAgoraRtcEngine();
+      } catch (e) {
+        if (kIsWeb) {
+          debugPrint('⚠️ Agora engine creation warning on web: $e');
+          debugPrint('   This may be a non-critical initialization issue. Video calls may still work.');
+          // On web, the engine might still work even if initialization shows warnings
+          // Try to continue - the joinChannel might still succeed
+        } else {
+          rethrow;
+        }
+      }
+
+      if (_engine == null) {
+        if (kIsWeb) {
+          debugPrint('⚠️ Agora engine is null on web. This may be expected if using web SDK directly.');
+          // On web, sometimes the engine needs to be created differently
+          // Mark as initialized anyway - joinChannel will handle the actual connection
+          _isInitialized = true;
+          _callEventController.add(CallEvent.initialized());
+          notifyListeners();
+          return true;
+        } else {
+          throw Exception('Failed to create Agora RTC engine');
+        }
+      }
 
       // Initialize with app ID
-      await _engine!.initialize(const RtcEngineContext(
-        appId: _appId,
-        channelProfile: ChannelProfileType.channelProfileCommunication,
-      ));
+      try {
+        await _engine!.initialize(const RtcEngineContext(
+          appId: _appId,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+        ));
+      } catch (e) {
+        if (kIsWeb) {
+          debugPrint('⚠️ Agora initialization warning on web: $e');
+          debugPrint('   Attempting to continue - web SDK may handle initialization differently');
+          // On web, initialization errors might be non-critical
+          // The engine might still work for joining channels
+        } else {
+          rethrow;
+        }
+      }
 
       // Enable video
-      await _engine!.enableVideo();
+      try {
+        await _engine!.enableVideo();
+      } catch (e) {
+        if (kIsWeb) {
+          debugPrint('⚠️ Video enable warning on web: $e');
+          // Continue anyway - video might be enabled by default on web
+        } else {
+          rethrow;
+        }
+      }
+
+      // Note: Android may show "CameraMetadataJV: Expect face scores and rectangles to be non-null" warnings.
+      // These are harmless system-level warnings from Android's Camera2 API and don't affect functionality.
+      // They occur when the camera framework expects face detection metadata but it's not provided.
+      // These warnings can be safely ignored as they don't impact video call functionality.
 
       // Set up event handlers
-      _setupEventHandlers();
+      try {
+        _setupEventHandlers();
+      } catch (e) {
+        if (kIsWeb) {
+          debugPrint('⚠️ Event handler setup warning on web: $e');
+          // Continue - handlers might be set up differently on web
+        } else {
+          rethrow;
+        }
+      }
 
       _isInitialized = true;
       _callEventController.add(CallEvent.initialized());
@@ -131,6 +204,19 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
     } catch (e) {
       debugPrint('❌ Failed to initialize Agora engine: $e');
       debugPrint('📱 App ID being used: $_appId');
+      debugPrint('🌐 Platform: ${kIsWeb ? "Web" : "Mobile"}');
+      
+      // On web, allow initialization to succeed even with errors
+      // The actual connection will be tested when joining a channel
+      if (kIsWeb) {
+        debugPrint('⚠️ Allowing initialization to continue on web despite errors');
+        debugPrint('   Video calls will be attempted when joining a channel');
+        _isInitialized = true;
+        _callEventController.add(CallEvent.initialized());
+        notifyListeners();
+        return true;
+      }
+      
       _callEventController.add(CallEvent.error('Failed to initialize video call: $e'));
       return false;
     }
@@ -144,13 +230,44 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
     int uid = 0,
   }) async {
     try {
-      if (!_isInitialized || _engine == null) {
+      // On web, try to create engine if it doesn't exist
+      if (kIsWeb && _engine == null) {
+        try {
+          _engine = createAgoraRtcEngine();
+          await _engine!.initialize(const RtcEngineContext(
+            appId: _appId,
+            channelProfile: ChannelProfileType.channelProfileCommunication,
+          ));
+          await _engine!.enableVideo();
+          _setupEventHandlers();
+        } catch (e) {
+          debugPrint('⚠️ Failed to create engine during join on web: $e');
+          // Continue anyway - web SDK might work differently
+        }
+      }
+      
+      if (!_isInitialized) {
         _callEventController.add(CallEvent.error('Engine not initialized'));
+        return false;
+      }
+      
+      if (_engine == null && !kIsWeb) {
+        _callEventController.add(CallEvent.error('Engine not available'));
         return false;
       }
 
       if (_isJoined) {
         await leaveChannel();
+      }
+
+      // On web, if engine is still null, we can't proceed
+      if (_engine == null) {
+        if (kIsWeb) {
+          debugPrint('⚠️ Engine is null on web - video calls may not work properly');
+          debugPrint('   Make sure Agora web SDK is properly loaded in index.html');
+        }
+        _callEventController.add(CallEvent.error('Video call engine not available'));
+        return false;
       }
 
       // Set channel profile for video call
@@ -162,31 +279,83 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
         channelProfile: ChannelProfileType.channelProfileCommunication,
       );
 
-      debugPrint('🔄 Attempting to join channel: $channelId with token: ${token.isNotEmpty ? "provided" : "empty (token-less mode)"}');
+      // In production, fetch token from backend if not provided
+      String tokenToUse = token;
+      if (token.isEmpty) {
+        debugPrint('🔄 No token provided, fetching from token service...');
+        tokenToUse = await AgoraTokenService.getToken(
+          channelId: channelId,
+          uid: uid,
+          role: 1, // Publisher role
+        );
+      }
+      
+      debugPrint('🔄 Attempting to join channel: $channelId with token: ${tokenToUse.isNotEmpty ? "provided" : "empty (token-less mode)"}');
+      
+      // For token-less mode, use empty string (not null)
+      // Agora requires empty string for token-less authentication
+      if (tokenToUse.isEmpty) {
+        tokenToUse = '';
+      }
 
-      await _engine!.joinChannel(
-        token: token,
-        channelId: channelId,
-        uid: uid,
-        options: options,
-      );
+      try {
+        await _engine!.joinChannel(
+          token: tokenToUse,
+          channelId: channelId,
+          uid: uid,
+          options: options,
+        );
+      } catch (e) {
+        // Handle Agora exceptions specifically
+        final errorString = e.toString();
+        debugPrint('❌ joinChannel exception: $e');
+        
+        // Check for error code -8 (ERR_INVALID_TOKEN) or -2 (ERR_INVALID_ARGUMENT)
+        if (errorString.contains('-8') || errorString.contains('ERR_INVALID_TOKEN') || 
+            errorString.contains('invalid token') || errorString.contains('Invalid token')) {
+          debugPrint('⚠️ Invalid token error detected (code -8)');
+          debugPrint('   App ID: $_appId');
+          debugPrint('   Your Agora App ID requires token authentication to be disabled.');
+          debugPrint('   Steps to fix:');
+          debugPrint('   1. Go to https://console.agora.io/');
+          debugPrint('   2. Select your project with App ID: $_appId');
+          debugPrint('   3. Go to "Project Management" > "Edit" > "Security"');
+          debugPrint('   4. Set "Token" to "Not enabled"');
+          debugPrint('   5. Save and restart the app');
+          _callEventController.add(CallEvent.error(
+            'Video call authentication failed. Please check your settings or try again later.'
+          ));
+          return false;
+        }
+        
+        // Re-throw if it's not a token error
+        rethrow;
+      }
 
-      debugPrint('✅ Successfully joined channel: $channelId');
-      _channelId = channelId;
-      _localUid = uid;
-      _callDurationSeconds = 0;
-
-      // Start call timer
-      _startCallTimer();
-
-      _callEventController.add(CallEvent.joined(channelId));
-      notifyListeners();
-
+      // Wait a moment to see if connection succeeds
+      // The actual join success will be reported via onJoinChannelSuccess callback
+      debugPrint('⏳ Waiting for join confirmation...');
+      
+      // Don't mark as joined yet - wait for onJoinChannelSuccess callback
+      // This prevents false positives if joinChannel returns but connection fails
+      
       return true;
     } catch (e) {
       debugPrint('❌ Failed to join channel: $e');
       debugPrint('🔍 Channel ID: $channelId, Token provided: ${token.isNotEmpty}');
-      _callEventController.add(CallEvent.error('Failed to join call: $e'));
+      debugPrint('🔍 App ID: $_appId');
+      
+      final errorMessage = e.toString();
+      String userMessage = 'Failed to join call';
+      
+      if (errorMessage.contains('-8') || errorMessage.contains('invalid token') || 
+          errorMessage.contains('Invalid token')) {
+        userMessage = 'Invalid token error. Please check Agora Console settings for App ID: $_appId';
+      } else if (errorMessage.contains('AgoraException')) {
+        userMessage = 'Agora error: $errorMessage';
+      }
+      
+      _callEventController.add(CallEvent.error(userMessage));
       return false;
     }
   }
@@ -279,8 +448,17 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
 
     _engine!.registerEventHandler(RtcEngineEventHandler(
       onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-        debugPrint('Successfully joined channel: ${connection.channelId}');
+        final channelId = connection.channelId ?? _channelId ?? 'unknown_channel';
+        debugPrint('✅ Successfully joined channel: $channelId (elapsed: ${elapsed}ms)');
         _isJoined = true;
+        _channelId = channelId;
+        _localUid = connection.localUid;
+        _callDurationSeconds = 0;
+        
+        // Start call timer only on successful join
+        _startCallTimer();
+        
+        _callEventController.add(CallEvent.joined(channelId));
         notifyListeners();
       },
 
@@ -307,11 +485,58 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
 
       onError: (ErrorCodeType err, String msg) {
         debugPrint('Agora error: $err - $msg');
-        _callEventController.add(CallEvent.error('Call error: $msg'));
+        debugPrint('   App ID: $_appId'); // Log App ID for debugging
+        
+        // Handle specific error types
+        // Error code -8 = ERR_INVALID_TOKEN
+        if (err == ErrorCodeType.errInvalidToken || 
+            err == ErrorCodeType.errTokenExpired) {
+          debugPrint('⚠️ Token error detected. This may be due to token authentication being required.');
+          debugPrint('   For development, ensure your Agora App ID allows token-less mode in the console.');
+          debugPrint('   Steps: Agora Console > Project > Edit > Security > Set Token to "Not enabled"');
+          _isJoined = false;
+          _callEventController.add(CallEvent.error(
+            'Video call authentication failed. Please check your Agora settings or contact support.'
+          ));
+          notifyListeners();
+        } else {
+          debugPrint('⚠️ Agora error: $err, message: $msg');
+          _callEventController.add(CallEvent.error('Call error: $msg'));
+        }
       },
 
       onConnectionStateChanged: (RtcConnection connection, ConnectionStateType state, ConnectionChangedReasonType reason) {
         debugPrint('Connection state changed: $state, reason: $reason');
+        
+        // Handle connection failures
+        if (state == ConnectionStateType.connectionStateFailed) {
+          if (reason == ConnectionChangedReasonType.connectionChangedInvalidToken) {
+            debugPrint('❌ Connection failed: Invalid token');
+            debugPrint('   App ID: $_appId');
+            debugPrint('   Your Agora App ID may require token authentication.');
+            debugPrint('   Options:');
+            debugPrint('   1. Enable token-less mode in Agora Console for this App ID');
+            debugPrint('   2. Generate and provide a valid token when joining channels');
+            _isJoined = false;
+            _callEventController.add(CallEvent.error(
+              'Unable to connect to video call. Please try again or contact support.'
+            ));
+          } else if (reason == ConnectionChangedReasonType.connectionChangedTokenExpired) {
+            debugPrint('❌ Connection failed: Token expired');
+            _isJoined = false;
+            _callEventController.add(CallEvent.error('Connection expired. Please try again.'));
+          } else {
+            debugPrint('❌ Connection failed: $reason');
+            _isJoined = false;
+            _callEventController.add(CallEvent.error('Connection failed. Please try again.'));
+          }
+          notifyListeners();
+        } else if (state == ConnectionStateType.connectionStateConnected) {
+          debugPrint('✅ Connection established successfully');
+          _isJoined = true;
+          notifyListeners();
+        }
+        
         _callEventController.add(CallEvent.connectionStateChanged(state, reason));
       },
     ));

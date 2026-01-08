@@ -41,7 +41,7 @@ class VideoCallService extends ChangeNotifier {
 
   // Agora App ID - In production, this should be stored securely
   // TODO: Move to environment variables or secure storage
-  static const String _appId = "023887d77f714564850ef34e9c993659"; // Replace with actual App ID
+  static const String _appId = "0f3b01a62b1e4644b1ae017327c3be69";
 
   // Getters
   bool get isInitialized => _isInitialized;

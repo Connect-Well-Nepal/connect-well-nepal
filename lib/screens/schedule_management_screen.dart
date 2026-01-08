@@ -269,7 +269,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                             Switch(
                               value: _isAvailableNow,
                               onChanged: _isLoading ? null : (value) => _toggleAvailability(),
-                              activeColor: AppColors.successGreen,
+                              activeThumbColor: AppColors.successGreen,
                             ),
                           ],
                         ),
