@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -34,6 +35,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _isInitializing = true;
   String? _errorMessage;
   int? _remoteUid;
+  String _connectionStatus = 'Connecting...';
+  Timer? _connectionTimeout;
 
   @override
   void initState() {
@@ -61,14 +64,43 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     videoCallService.callEvents.listen((event) {
       if (mounted) {
         if (event.type == CallEventType.error) {
+          _connectionTimeout?.cancel();
           setState(() {
             _errorMessage = event.errorMessage;
             _isInitializing = false;
+            _connectionStatus = 'Connection failed';
           });
         } else if (event.type == CallEventType.joined) {
+          _connectionTimeout?.cancel();
           setState(() {
             _isInitializing = false;
+            _connectionStatus = 'Connected';
           });
+        } else if (event.type == CallEventType.connectionStateChanged) {
+          final data = event.data as Map<String, dynamic>?;
+          if (data != null) {
+            final state = data['state'];
+            final reason = data['reason'];
+            
+            if (state.toString().contains('Connecting')) {
+              setState(() {
+                _connectionStatus = 'Connecting...';
+              });
+            } else if (state.toString().contains('Connected')) {
+              _connectionTimeout?.cancel();
+              setState(() {
+                _isInitializing = false;
+                _connectionStatus = 'Connected';
+              });
+            } else if (state.toString().contains('Failed')) {
+              _connectionTimeout?.cancel();
+              setState(() {
+                _errorMessage = 'Connection failed: $reason';
+                _isInitializing = false;
+                _connectionStatus = 'Failed';
+              });
+            }
+          }
         }
       }
     });
@@ -84,6 +116,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         return;
       }
 
+      // Set up connection timeout (30 seconds)
+      _connectionTimeout = Timer(const Duration(seconds: 30), () {
+        if (mounted && _isInitializing) {
+          setState(() {
+            _errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+            _isInitializing = false;
+            _connectionStatus = 'Timeout';
+          });
+        }
+      });
+
       final joined = await videoCallService.joinChannel(
         channelId: widget.channelId,
         token: widget.token,
@@ -91,6 +134,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
 
       if (!joined) {
+        _connectionTimeout?.cancel();
         setState(() {
           _errorMessage = 'Failed to join video call';
           _isInitializing = false;
@@ -114,6 +158,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   void dispose() {
+    _connectionTimeout?.cancel();
     // Note: We don't dispose the service here as it's managed by Provider
     // The service will handle cleanup when leaving the channel
     super.dispose();
@@ -142,15 +187,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Widget _buildLoadingView() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Colors.white),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(color: Colors.white),
+          const SizedBox(height: 16),
           Text(
-            'Connecting...',
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            _connectionStatus,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Please wait...',
+            style: TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),

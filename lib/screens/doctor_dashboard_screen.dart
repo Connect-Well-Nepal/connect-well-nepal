@@ -449,7 +449,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           else
             ..._todayAppointments.take(3).map((appointment) {
               return _buildAppointmentCardFromModel(appointment, isDark);
-            }).toList(),
+            }),
 
           const SizedBox(height: 24),
 
