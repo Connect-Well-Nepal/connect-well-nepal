@@ -11,6 +11,7 @@ import '../widgets/appointment_card.dart';
 import '../providers/app_provider.dart';
 import '../services/database_service.dart';
 import '../services/local_notification_service.dart';
+import '../services/agora_token_service.dart';
 import 'booking_screen.dart';
 import 'doctor_profile_screen.dart';
 import 'schedule_management_screen.dart';
@@ -1184,7 +1185,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   }
 
   /// Join consultation
-  void _joinConsultation(Appointment appointment) {
+  void _joinConsultation(Appointment appointment) async {
     final appProvider = context.read<AppProvider>();
     final currentUser = appProvider.currentUser;
     
@@ -1199,9 +1200,26 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
       return;
     }
     
+    // Check if appointment is confirmed
+    if (appointment.status != 'confirmed') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Appointment must be confirmed by doctor before joining consultation'),
+          backgroundColor: AppColors.secondaryCrimsonRed,
+        ),
+      );
+      return;
+    }
+    
     // Generate channel ID based on appointment ID (ensures same channel for patient and doctor)
     final String channelId = 'appointment_${appointment.id}';
-    const String token = ''; // Empty token for testing (token-less mode with Agora)
+    
+    // Get token from token service
+    final token = await AgoraTokenService.getToken(
+      channelId: channelId,
+      uid: 0, // Auto-assign UID
+      role: 1, // Publisher role
+    );
     
     // Determine participant names based on user role
     String? participantName;

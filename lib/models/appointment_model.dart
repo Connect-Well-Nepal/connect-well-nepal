@@ -193,11 +193,12 @@ class Appointment {
            dateTime.day == now.day;
   }
 
-  /// Check if can join consultation (within 15 minutes of scheduled time)
-  /// Allows joining for both 'pending' and 'confirmed' appointments
+  /// Check if can join consultation (only when appointment is confirmed/approved)
+  /// Only allows joining for 'confirmed' appointments within the time window
   bool get canJoin {
-    // Allow joining if status is pending or confirmed
-    if (status != 'confirmed' && status != 'pending') return false;
+    // Only allow joining if status is confirmed (approved by doctor)
+    if (status != 'confirmed') return false;
+    
     final now = DateTime.now();
     final difference = dateTime.difference(now);
     // Allow joining 15 minutes before scheduled time and up to 2 hours after

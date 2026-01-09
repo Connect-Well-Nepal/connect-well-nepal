@@ -182,7 +182,7 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
       // Note: Android may show "CameraMetadataJV: Expect face scores and rectangles to be non-null" warnings.
       // These are harmless system-level warnings from Android's Camera2 API and don't affect functionality.
       // They occur when the camera framework expects face detection metadata but it's not provided.
-      // These warnings can be safely ignored as they don't impact video call functionality.
+      // These warnings are filtered out in production builds and can be safely ignored in debug mode.
 
       // Set up event handlers
       try {
@@ -513,13 +513,22 @@ class VideoCallServiceMobile extends VideoCallServiceBase {
           if (reason == ConnectionChangedReasonType.connectionChangedInvalidToken) {
             debugPrint('❌ Connection failed: Invalid token');
             debugPrint('   App ID: $_appId');
-            debugPrint('   Your Agora App ID may require token authentication.');
-            debugPrint('   Options:');
-            debugPrint('   1. Enable token-less mode in Agora Console for this App ID');
-            debugPrint('   2. Generate and provide a valid token when joining channels');
+            debugPrint('   Channel ID: ${connection.channelId ?? channelId}');
+            debugPrint('');
+            debugPrint('🔧 SOLUTION: Disable Token Authentication in Agora Console');
+            debugPrint('   1. Go to https://console.agora.io/');
+            debugPrint('   2. Select project: connectwellnepal (App ID: $_appId)');
+            debugPrint('   3. Navigate to: Project Management > Edit > Security');
+            debugPrint('   4. Set "Token" to "Not enabled"');
+            debugPrint('   5. Save and restart the app');
+            debugPrint('');
+            debugPrint('   OR if you want to use tokens:');
+            debugPrint('   - Generate a temp token with EXACT channel name: ${connection.channelId ?? channelId}');
+            debugPrint('   - Update testToken in agora_token_service.dart');
+            debugPrint('   - Set forceTokenLessMode = false');
             _isJoined = false;
             _callEventController.add(CallEvent.error(
-              'Unable to connect to video call. Please try again or contact support.'
+              'Connection failed: Invalid token. Please disable token authentication in Agora Console for development.'
             ));
           } else if (reason == ConnectionChangedReasonType.connectionChangedTokenExpired) {
             debugPrint('❌ Connection failed: Token expired');
