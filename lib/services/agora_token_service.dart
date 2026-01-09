@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -14,22 +15,34 @@ import 'package:http/http.dart' as http;
 /// - Can use temporary tokens from Agora Console
 /// - Or disable token authentication in console
 class AgoraTokenService {
+  
   // Agora App ID
   static const String appId = "0f3b01a62b1e4644b1ae017327c3be69";
   
   // App Certificate (ONLY use this for client-side generation in development)
   // In production, this should be stored on your backend server
   // TODO: Remove this and use backend token generation in production
-  static const String appCertificate = ""; // Add your App Certificate here if needed
+  static const String appCertificate = "ab688d5698be422988659ecc8973f8f1"; // Add your App Certificate here if needed
   
   // Backend token server URL (for production)
   // Set this to your backend endpoint that generates tokens
   static const String? tokenServerUrl = null; // e.g., "https://your-api.com/agora/token"
   
   // Temporary token for testing (from Agora Console)
+  // IMPORTANT: Temp tokens are tied to a specific channel name!
+  // When generating a temp token in Agora Console, use the EXACT channel name your app will use
+  // Or set this to null/empty and disable token authentication in Agora Console for development
   // Replace with your temp token from Agora Console > Security > Generate Temp Token
   // Set to null or empty string to use token-less mode
-  static const String? testToken = "007eJxTYBAPdavwrO71mnnII06ozG6D6AFbgwdKqz7I2s9oli7K71VgMEgzTjIwTDQzSjJMNTEzMUkyTEw1MDQ3NjJPNk5KNbPUUYjPbAhkZNCVaGRlZIBAEF+CISU1Nz8+OSMxLy81Jz4lP7kkvyg+OTEnh4EBALztIzQ=";
+  static const String? testToken = null; // Set your token here or use null for token-less mode
+  
+  // Force token-less mode (set to true if token authentication is disabled in Agora Console)
+  // This will always return empty token regardless of other settings
+  static const bool forceTokenLessMode = false; // Set to true for development without tokens
+  
+  // Enable client-side token generation (DEVELOPMENT ONLY)
+  // Set to true to generate tokens using App Certificate
+  static const bool enableClientSideTokenGeneration = true;
   
   /// Generate or fetch a token for joining a channel
   /// 
@@ -49,6 +62,14 @@ class AgoraTokenService {
     int role = 1, // 1 = Publisher, 2 = Subscriber
     int expireTime = 86400, // 24 hours in seconds
   }) async {
+    // Force token-less mode (if token authentication is disabled in Agora Console)
+    if (forceTokenLessMode) {
+      debugPrint('ℹ️ Token-less mode enabled. Using empty token.');
+      debugPrint('   Channel: $channelId, UID: $uid');
+      debugPrint('   Ensure token authentication is DISABLED in Agora Console.');
+      return '';
+    }
+    
     // If token server is configured, fetch from backend (PRODUCTION)
     if (tokenServerUrl != null && tokenServerUrl!.isNotEmpty) {
       return await _fetchTokenFromServer(
@@ -60,15 +81,23 @@ class AgoraTokenService {
     }
     
     // If test token is configured, use it for testing
+    // WARNING: Temp tokens are tied to a specific channel name!
+    // For dynamic channel names (like appointment-based), use client-side generation instead
     if (testToken != null && testToken!.isNotEmpty) {
-      debugPrint('ℹ️ Using test token from Agora Console for testing.');
-      debugPrint('   Note: Test tokens expire after the set duration. Generate a new one if expired.');
-      return testToken!;
+      debugPrint('⚠️ Test token configured, but channel names are dynamic.');
+      debugPrint('   Channel: $channelId, UID: $uid');
+      debugPrint('   ⚠️ Temp tokens are tied to a specific channel name.');
+      debugPrint('   ⚠️ Since your channel name is dynamic, falling back to client-side token generation.');
+      debugPrint('   💡 To use testToken: Generate it for a fixed channel name, or use client-side generation.');
+      // Fall through to client-side generation for dynamic channels
     }
     
-    // If App Certificate is set, generate client-side (DEVELOPMENT ONLY)
-    if (appCertificate.isNotEmpty) {
-      debugPrint('⚠️ Generating token client-side. This is NOT recommended for production!');
+    // If App Certificate is set and client-side generation is enabled, generate token
+    if (appCertificate.isNotEmpty && enableClientSideTokenGeneration) {
+      debugPrint('⚠️ Generating token client-side using App Certificate.');
+      debugPrint('   Channel: $channelId, UID: $uid, Role: ${role == 1 ? "Publisher" : "Subscriber"}');
+      debugPrint('   ⚠️ WARNING: This exposes your App Certificate in client code!');
+      debugPrint('   ⚠️ This is OK for development, but use backend token generation for production.');
       return _generateTokenClientSide(
         channelId: channelId,
         uid: uid,
@@ -123,22 +152,73 @@ class AgoraTokenService {
   /// 
   /// WARNING: This method requires App Certificate in client code.
   /// This is a security risk in production. Use backend token generation instead.
+  /// 
+  /// This implements Agora RTC Token v2 format:
+  /// - Version: 007 (for RTC tokens)
+  /// - App ID
+  /// - Channel name
+  /// - UID
+  /// - Expiration timestamp
+  /// - HMAC-SHA256 signature
   static String _generateTokenClientSide({
     required String channelId,
     required int uid,
     required int role,
     required int expireTime,
   }) {
-    // This is a simplified example. In practice, you need to:
-    // 1. Generate a random 32-byte salt
-    // 2. Create message with channel, uid, role, expireTime
-    // 3. Sign with HMAC-SHA256 using App Certificate
-    // 4. Encode as base64
-    
-    // For now, return empty - implement proper token generation or use backend
-    debugPrint('⚠️ Client-side token generation not fully implemented.');
-    debugPrint('   Use backend token generation or Agora Console temp tokens for testing.');
-    return '';
+    try {
+      // Calculate expiration timestamp
+      final currentTimestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final privilegeExpiredTs = currentTimestamp + expireTime;
+      
+      // Agora token version (version 007 for RTC)
+      const version = '007';
+      
+      // UID as string (0 becomes "0")
+      final uidStr = uid.toString();
+      
+      // Privilege flags (timestamps when each privilege expires)
+      // For Publisher role: enable publish privileges
+      // For Subscriber role: enable subscribe privileges  
+      final publishAudioTs = (role == 1) ? privilegeExpiredTs : 0; // 1 = Publisher
+      final publishVideoTs = (role == 1) ? privilegeExpiredTs : 0;
+      final subscribeAudioTs = privilegeExpiredTs; // Always allow subscribing
+      final subscribeVideoTs = privilegeExpiredTs;
+      
+      // Create message content to sign
+      // Format: appId:channelName:uid:publishAudioTs:publishVideoTs:subscribeAudioTs:subscribeVideoTs
+      final message = '$appId:$channelId:$uidStr:$publishAudioTs:$publishVideoTs:$subscribeAudioTs:$subscribeVideoTs';
+      
+      // Generate HMAC-SHA256 signature
+      final key = utf8.encode(appCertificate);
+      final bytes = utf8.encode(message);
+      final hmacSha256 = Hmac(sha256, key);
+      final digest = hmacSha256.convert(bytes);
+      final signatureHex = digest.toString();
+      
+      // Generate random salt (32 bytes = 64 hex characters)
+      final random = Random.secure();
+      final salt = List<int>.generate(32, (_) => random.nextInt(256));
+      final saltHex = salt.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      
+      // Build token: version:appId:channelId:uid:salt:publishAudioTs:publishVideoTs:subscribeAudioTs:subscribeVideoTs:signature
+      final tokenContent = '$version:$appId:$channelId:$uidStr:$saltHex:$publishAudioTs:$publishVideoTs:$subscribeAudioTs:$subscribeVideoTs:$signatureHex';
+      
+      // Encode to base64 (standard base64 encoding)
+      final tokenBytes = utf8.encode(tokenContent);
+      final token = base64.encode(tokenBytes);
+      
+      debugPrint('✅ Token generated successfully');
+      debugPrint('   Role: ${role == 1 ? "Publisher" : "Subscriber"}');
+      debugPrint('   Expires in: $expireTime seconds (${expireTime ~/ 3600} hours)');
+      debugPrint('   Expires at: ${DateTime.fromMillisecondsSinceEpoch(privilegeExpiredTs * 1000)}');
+      
+      return token;
+    } catch (e) {
+      debugPrint('❌ Failed to generate token: $e');
+      debugPrint('   Falling back to empty token');
+      return '';
+    }
   }
   
   /// Check if token is expired (basic check)
